@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carbón & Flama - Sistema POS & Gestión</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Selector Global de Roles (Barra Superior) -->
+    <header class="top-bar">
+        <div class="logo">
+            <span class="flame-icon">🔥</span>
+            <h1>Carbón & Flama</h1>
+        </div>
+        <div class="role-selector-container">
+            <label for="roleSelect">Modo de Vista / Rol:</label>
+            <select id="roleSelect" onchange="switchRole(this.value)">
+                <option value="admin">Administrador</option>
+                <option value="mesero" selected>Mesero / Salón</option>
+                <option value="cocina">Cocina (KDS)</option>
+                <option value="caja">Caja & Cobros</option>
+                <option value="almacen">Almacén e Inventario</option>
+            </select>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- ==================== VISTA MESERO ==================== -->
+        <section id="view-mesero" class="role-view active">
+            <div class="salon-header">
+                <h2>Mapa de Mesas</h2>
+                <div class="table-actions">
+                    <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
+                        🔗 Modo Unir Mesas
+                    </button>
+                    <button class="btn btn-primary" onclick="openTakeoutModal()">
+                        🛵 Para Llevar / WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mapa Visual de Mesas -->
+            <div class="tables-grid" id="tablesGrid">
+                <!-- Se genera dinámicamente -->
+            </div>
+
+            <!-- Modal / Interfaz de Toma de Pedidos -->
+            <div id="orderSection" class="order-section hidden">
+                <div class="order-header">
+                    <h3 id="currentOrderTitle">Tomando Pedido - Mesa 1</h3>
+                    <button class="btn-close" onclick="closeOrderSection()">✕</button>
+                </div>
+
+                <!-- Cliente & Fidelización -->
+                <div class="client-loyalty-bar">
+                    <input type="text" id="clientPhone" placeholder="Teléfono del cliente..." />
+                    <button class="btn btn-secondary" onclick="buscarOAgregarCliente()">🔍 Buscar / Recompensas</button>
+                    <span id="clientLoyaltyStatus" class="loyalty-tag"></span>
+                </div>
+
+                <div class="pos-layout">
+                    <!-- Categorías y Carta -->
+                    <div class="menu-container">
+                        <div class="categories-bar" id="categoriesBar">
+                            <button class="cat-btn active" onclick="filterCategory('Todas')">Todas</button>
+                            <button class="cat-btn" onclick="filterCategory('Parrillas')">Parrillas</button>
+                            <button class="cat-btn" onclick="filterCategory('Cenas')">Cenas</button>
+                            <button class="cat-btn" onclick="filterCategory('Selváticos')">Selváticos</button>
+                            <button class="cat-btn" onclick="filterCategory('Guarniciones')">Guarniciones</button>
+                            <button class="cat-btn" onclick="filterCategory('Bebidas')">Bebidas</button>
+                        </div>
+                        <div class="dishes-grid" id="dishesGrid">
+                            <!-- Se puebla con la carta -->
+                        </div>
+                    </div>
+
+                    <!-- Comanda / Ticket Actual -->
+                    <div class="cart-container">
+                        <h4>Comanda Actual</h4>
+                        <div id="cartItems" class="cart-items">
+                            <p class="empty-msg">No hay ítems seleccionados</p>
+                        </div>
+
+                        <div class="cart-summary">
+                            <div class="summary-row">
+                                <span>Subtotal:</span>
+                                <span id="cartSubtotal">S/ 0.00</span>
+                            </div>
+                            <div class="summary-row" id="taperRow" style="display:none;">
+                                <span>Envases / Tápers:</span>
+                                <span id="cartTapers">S/ 0.00</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span>Total:</span>
+                                <span id="cartTotal">S/ 0.00</span>
+                            </div>
+
+                            <div class="split-bill-box">
+                                <label>
+                                    <input type="checkbox" id="chkSplitBill" onchange="toggleSplitBill(this.checked)" />
+                                    Dividir Cuenta Separada
+                                </label>
+                                <input type="number" id="numSplitPersons" min="2" max="10" value="2" style="display:none;" onchange="updateCartUI()" />
+                            </div>
+
+                            <button class="btn btn-success btn-block" onclick="enviarPedidoACocina()">
+                                👨‍🍳 Enviar Pedido a Cocina
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA COCINA (KDS) ==================== -->
+        <section id="view-cocina" class="role-view">
+            <h2>Pantalla de Cocina (KDS)</h2>
+            <div class="kds-board">
+                <div class="kds-column">
+                    <div class="kds-column-header bg-pending">Pendiente</div>
+                    <div id="kdsPending" class="kds-list"></div>
+                </div>
+                <div class="kds-column">
+                    <div class="kds-column-header bg-preparing">En Preparación</div>
+                    <div id="kdsPreparing" class="kds-list"></div>
+                </div>
+                <div class="kds-column">
+                    <div class="kds-column-header bg-delivered">Entregado</div>
+                    <div id="kdsDelivered" class="kds-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA CAJA ==================== -->
+        <section id="view-caja" class="role-view">
+            <h2>Caja y Emisión de Comprobantes</h2>
+            <div class="caja-grid">
+                <div class="caja-tables-list">
+                    <h3>Mesas Ocupadas por Cobrar</h3>
+                    <div id="cajaPendingList" class="cards-list"></div>
+                </div>
+                <div class="caja-checkout" id="checkoutPanel" style="display:none;">
+                    <h3>Cobrar Comanda</h3>
+                    <div id="checkoutDetails"></div>
+                    <div class="payment-method-selector">
+                        <label>Método de Pago:</label>
+                        <select id="paymentMethod">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Yape/Plin">Yape / Plin</option>
+                            <option value="Tarjeta">Tarjeta de Débito/Crédito</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success btn-block" onclick="procesarPago()">
+                        💳 Emitir Comprobante y Cerrar Cuenta
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA ADMINISTRADOR ==================== -->
+        <section id="view-admin" class="role-view">
+            <h2>Panel de Administración y Finanzas</h2>
+            
+            <div class="dashboard-kpi-grid">
+                <div class="kpi-card">
+                    <h4>Ventas Totales</h4>
+                    <p id="kpiVentasTotal">S/ 0.00</p>
+                </div>
+                <div class="kpi-card danger">
+                    <h4>Gastos Operativos</h4>
+                    <p id="kpiGastosTotal">S/ 0.00</p>
+                </div>
+                <div class="kpi-card success">
+                    <h4>Utilidad Estimada</h4>
+                    <p id="kpiUtilidad">S/ 0.00</p>
+                </div>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="switchAdminTab('finanzas')">💰 Gastos y Finanzas</button>
+                <button class="tab-btn" onclick="switchAdminTab('platos')">🍖 CRUD Platos & Carta Festiva</button>
+            </div>
+
+            <!-- Tab Finanzas -->
+            <div id="adminTabFinanzas" class="admin-tab-content active">
+                <div class="form-card">
+                    <h3>Registrar Gasto del Local</h3>
+                    <form id="formGasto" onsubmit="registrarGasto(event)">
+                        <div class="form-group">
+                            <label>Categoría:</label>
+                            <select id="gastoCategoria" required>
+                                <option value="Servicios">Servicios (Luz, Agua, Gas)</option>
+                                <option value="Personal">Personal / Planilla</option>
+                                <option value="Alquiler">Alquiler</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Descripción:</label>
+                            <input type="text" id="gastoDesc" placeholder="Ej: Pago recibo de luz" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Monto (S/):</label>
+                            <input type="number" step="0.10" id="gastoMonto" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                    </form>
+                </div>
+
+                <h3>Historial de Gastos Registrados</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Categoría</th>
+                            <th>Descripción</th>
+                            <th>Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gastosTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Tab Platos -->
+            <div id="adminTabPlatos" class="admin-tab-content">
+                <div class="form-card">
+                    <h3>Administración de Platos</h3>
+                    <p>Puedes cambiar entre Carta Normal o Carta Festiva (aplica recargo automático).</p>
+                    <label>
+                        <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)"> Activar Carta Festiva (+S/ 3.00 en parrillas)
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA ALMACÉN ==================== -->
+        <section id="view-almacen" class="role-view">
+            <h2>Control de Inventario y Almacén</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Insumo / Producto</th>
+                        <th>Stock Actual</th>
+                        <th>Mínimo Requerido</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="almacenTableBody">
+                    <tr>
+                        <td>Carne de Lomo (kg)</td>
+                        <td>15.5 kg</td>
+                        <td>5.0 kg</td>
+                        <td><span class="badge badge-success">OK</span></td>
+                    </tr>
+                    <tr>
+                        <td>Envases / Tápers</td>
+                        <td>8 unidades</td>
+                        <td>20 unidades</td>
+                        <td><span class="badge badge-danger">Stock Bajo</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- Modal Modificador de Acompañamiento -->
+    <div id="modifierModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Selecciona Opción de Acompañamiento</h3>
+            <div id="modifierOptions" class="modifier-options"></div>
+            <button class="btn btn-secondary" onclick="closeModifierModal()">Cancelar</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

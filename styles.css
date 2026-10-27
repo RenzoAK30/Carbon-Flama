@@ -1,0 +1,184 @@
+:root {
+    --primary-color: #d35400;
+    --primary-hover: #e67e22;
+    --bg-dark: #1e1e24;
+    --card-bg: #2b2d42;
+    --text-color: #f8f9fa;
+    --accent-green: #2ecc71;
+    --accent-red: #e74c3c;
+    --accent-yellow: #f1c40f;
+    --border-color: #3d405b;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-color);
+}
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #111217;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.flame-icon {
+    font-size: 1.8rem;
+}
+
+.container {
+    padding: 2rem;
+}
+
+.role-view {
+    display: none;
+}
+
+.role-view.active {
+    display: block;
+}
+
+/* Tablas Mesero */
+.tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.table-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    border: 3px solid var(--accent-green);
+    transition: transform 0.2s;
+}
+
+.table-card.occupied {
+    border-color: var(--accent-red);
+}
+
+.table-card.selected-for-join {
+    border-color: var(--accent-yellow);
+    box-shadow: 0 0 10px var(--accent-yellow);
+}
+
+/* Layout POS */
+.pos-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.dishes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.dish-card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+}
+
+.dish-card:hover {
+    border-color: var(--primary-color);
+}
+
+.cart-container {
+    background: var(--card-bg);
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+/* KDS */
+.kds-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.kds-column-header {
+    padding: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 6px;
+}
+
+.bg-pending { background-color: var(--accent-yellow); color: #000; }
+.bg-preparing { background-color: var(--primary-color); }
+.bg-delivered { background-color: var(--accent-green); }
+
+/* Dashboard KPI */
+.dashboard-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 5px solid var(--primary-color);
+}
+
+.kpi-card.danger { border-left-color: var(--accent-red); }
+.kpi-card.success { border-left-color: var(--accent-green); }
+
+/* Utility Classes */
+.btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.btn-primary { background: var(--primary-color); color: #fff; }
+.btn-secondary { background: #4a4e69; color: #fff; }
+.btn-success { background: var(--accent-green); color: #fff; }
+.btn-block { width: 100%; margin-top: 1rem; }
+
+.hidden { display: none !important; }
+
+/* Modales */
+.modal {
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 12px;
+    min-width: 320px;
+}
