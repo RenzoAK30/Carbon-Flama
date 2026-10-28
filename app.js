@@ -1,8 +1,10 @@
-// Configuración de Supabase
+// Configuración y conexión segura con Supabase (Evita redeclaraciones)
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Usamos window.supabaseClient para evitar chocar con nombres globales de la librería CDN
+window.supabaseClient = window.supabaseClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabaseClient;
 
 let currentRole = 'mesero';
 let isCartaFestiva = false;
@@ -31,14 +33,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // Cargar mesas y platos dinámicamente desde Supabase
 async function cargarDatosDesdeSupabase() {
     try {
-        // Cargar mesas
-        const { data: dbMesas, error: errMesas } = await supabase.from('mesas').select('*');
+        const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
         if (!errMesas && dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
         }
 
-        // Cargar platos
-        const { data: dbPlatos, error: errPlatos } = await supabase.from('platos').select('*');
+        const { data: dbPlatos, error: errPlatos } = await db.from('platos').select('*');
         if (!errPlatos && dbPlatos) {
             dishes = dbPlatos.map(p => ({
                 id: p.id,
@@ -71,7 +71,7 @@ async function handleLogin(event) {
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('usuarios')
             .select('*')
             .ilike('usuario', usuarioInput);
@@ -205,7 +205,7 @@ function updateCartUI() {
     const subTotalEl = document.getElementById('cartSubtotal');
     const totalEl = document.getElementById('cartTotal');
     if (subTotalEl) subTotalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
-    if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
+    if (totalEl) totalEl.innerText = `S/ ${total.toFixed(2)}`;
 }
 
 function toggleCartaFestiva(isFestiva) {
@@ -221,13 +221,13 @@ async function registrarGasto(event) {
     const descripcion = document.getElementById('gastoDesc').value;
     const monto = parseFloat(document.getElementById('gastoMonto').value);
 
-    await supabase.from('gastos').insert([{ categoria, descripcion, monto }]);
+    await db.from('gastos').insert([{ categoria, descripcion, monto }]);
     alert('Gasto registrado con éxito');
     loadFinanzasData();
 }
 
 async function loadFinanzasData() {
-    const { data: gastos } = await supabase.from('gastos').select('*');
+    const { data: gastos } = await db.from('gastos').select('*');
     if (gastos) {
         let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
         const kpi = document.getElementById('kpiGastosTotal');
@@ -243,7 +243,7 @@ async function agregarPlato(event) {
     const festivo = festivoVal ? parseFloat(festivoVal) : precio;
     const categoria = document.getElementById('platoCategoria').value;
 
-    const { error } = await supabase.from('platos').insert([{ nombre, categoria, precio, festivo }]);
+    const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo }]);
     if (error) {
         alert('Error al agregar plato: ' + error.message);
     } else {
@@ -276,7 +276,7 @@ async function agregarMesaSalon() {
     const num = document.getElementById('nuevaMesaNum').value;
     if (num) {
         const nombre = `Mesa ${num}`;
-        const { error } = await supabase.from('mesas').insert([{ nombre, status: 'free' }]);
+        const { error } = await db.from('mesas').insert([{ nombre, status: 'free' }]);
         if (error) {
             alert('Error al agregar mesa: ' + error.message);
         } else {
@@ -287,7 +287,7 @@ async function agregarMesaSalon() {
 }
 
 async function eliminarMesa(id) {
-    const { error } = await supabase.from('mesas').delete().eq('id', id);
+    const { error } = await db.from('mesas').delete().eq('id', id);
     if (error) {
         alert('Error al eliminar mesa: ' + error.message);
     } else {
@@ -302,7 +302,7 @@ async function crearUsuarioTrabajador(e) {
     const password = document.getElementById('usrPass').value;
     const rol = document.getElementById('usrRol').value;
 
-    const { error } = await supabase.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
+    const { error } = await db.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
     if (error) {
         alert('Error al crear usuario: ' + error.message);
     } else {
