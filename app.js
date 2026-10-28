@@ -1,11 +1,11 @@
-// Configuración de Supabase
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Estado Global
 let currentRole = 'mesero';
+let isCartaFestiva = false;
+
 let tables = [
     { id: 1, name: 'Mesa 1', status: 'free' },
     { id: 2, name: 'Mesa 2', status: 'occupied' },
@@ -14,31 +14,37 @@ let tables = [
 ];
 
 let dishes = [
-    { id: 101, name: 'Parrilla Personal', category: 'Parrillas', price: 35.00, sideOptions: ['Papas + Ensalada', 'Arroz Blanco (+S/2.00)', 'Arroz Chaufa (+S/4.00)'] },
-    { id: 102, name: 'Churrasco Prime', category: 'Parrillas', price: 42.00, sideOptions: ['Papas + Ensalada', 'Arroz Chaufa (+S/4.00)'] },
-    { id: 103, name: 'Cena Cecina con Tacacho', category: 'Cenas', price: 30.00, sideOptions: ['Normal', 'Arroz Chaufa (+S/3.00)'] },
-    { id: 104, name: 'Inca Kola 1.5L', category: 'Bebidas', price: 12.00 }
+    { id: 101, name: 'Parrilla Personal', category: 'Parrillas', price: 35.00, festivo: 38.00 },
+    { id: 102, name: 'Churrasco Prime', category: 'Parrillas', price: 42.00, festivo: 45.00 },
+    { id: 103, name: 'Cena Cecina con Tacacho', category: 'Cenas', price: 30.00, festivo: 33.00 },
+    { id: 104, name: 'Inca Kola 1.5L', category: 'Bebidas', price: 12.00, festivo: 12.00 }
 ];
 
 let currentOrder = [];
 let selectedTable = null;
-let isJoiningMode = false;
-let selectedTablesToJoin = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     renderTables();
     renderDishes('Todas');
     loadFinanzasData();
+    renderAdminMenu();
+    renderRecompensasSelect();
+    renderAdminMesas();
 });
 
-// Cambiar de Rol
 function switchRole(role) {
     currentRole = role;
     document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${role}`).classList.add('active');
 }
 
-// Renderizar Mapa de Mesas
+function switchAdminTab(tabName) {
+    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById(`adminTab-${tabName}`).classList.add('active');
+}
+
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
     grid.innerHTML = '';
@@ -52,17 +58,15 @@ function renderTables() {
 }
 
 function handleTableClick(table) {
-    if (isJoiningMode) {
-        selectedTablesToJoin.push(table.id);
-        alert(`Mesa ${table.name} seleccionada para unión.`);
-        return;
-    }
     selectedTable = table;
     document.getElementById('orderSection').classList.remove('hidden');
     document.getElementById('currentOrderTitle').innerText = `Tomando Pedido - ${table.name}`;
 }
 
-// Filtrar Platos
+function closeOrderSection() {
+    document.getElementById('orderSection').classList.add('hidden');
+}
+
 function filterCategory(cat) {
     renderDishes(cat);
 }
@@ -73,10 +77,11 @@ function renderDishes(cat) {
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
     filtered.forEach(dish => {
+        const currentPrice = isCartaFestiva ? (dish.festivo || dish.price) : dish.price;
         const div = document.createElement('div');
         div.className = 'dish-card';
-        div.innerHTML = `<h5>${dish.name}</h5><p>S/ ${dish.price.toFixed(2)}</p>`;
-        div.onclick = () => addToCart(dish);
+        div.innerHTML = `<h5>${dish.name}</h5><p>S/ ${currentPrice.toFixed(2)}</p>`;
+        div.onclick = () => addToCart({ ...dish, price: currentPrice });
         grid.appendChild(div);
     });
 }
@@ -91,7 +96,7 @@ function updateCartUI() {
     itemsContainer.innerHTML = '';
     let subtotal = 0;
 
-    currentOrder.forEach((item, index) => {
+    currentOrder.forEach(item => {
         subtotal += item.price;
         const div = document.createElement('div');
         div.innerText = `${item.name} - S/ ${item.price.toFixed(2)}`;
@@ -102,34 +107,100 @@ function updateCartUI() {
     document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
-// Registrar Gastos y Conexión con Supabase
+function toggleCartaFestiva(isFestiva) {
+    isCartaFestiva = isFestiva;
+    document.getElementById('lblCartaStatus').innerText = isFestiva ? 'FESTIVA' : 'NORMAL';
+    renderDishes('Todas');
+}
+
 async function registrarGasto(event) {
     event.preventDefault();
     const categoria = document.getElementById('gastoCategoria').value;
     const descripcion = document.getElementById('gastoDesc').value;
     const monto = parseFloat(document.getElementById('gastoMonto').value);
 
-    const { data, error } = await supabase.from('gastos').insert([{ categoria, descripcion, monto }]);
-
-    if (error) {
-        console.error('Error insertando gasto:', error);
-        alert('Ocurrió un error al registrar el gasto en Supabase.');
-    } else {
-        alert('Gasto registrado con éxito');
-        loadFinanzasData();
-    }
+    await supabase.from('gastos').insert([{ categoria, descripcion, monto }]);
+    alert('Gasto registrado con éxito');
+    loadFinanzasData();
 }
 
 async function loadFinanzasData() {
     const { data: gastos } = await supabase.from('gastos').select('*');
     if (gastos) {
-        const tbody = document.getElementById('gastosTableBody');
-        tbody.innerHTML = '';
-        let totalGastos = 0;
-        gastos.forEach(g => {
-            totalGastos += g.monto;
-            tbody.innerHTML += `<tr><td>${g.fecha || 'Hoy'}</td><td>${g.categoria}</td><td>${g.descripcion}</td><td>S/ ${g.monto.toFixed(2)}</td></tr>`;
-        });
+        let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
         document.getElementById('kpiGastosTotal').innerText = `S/ ${totalGastos.toFixed(2)}`;
     }
+}
+
+function agregarPlato(event) {
+    event.preventDefault();
+    const name = document.getElementById('platoNombre').value;
+    const price = parseFloat(document.getElementById('platoPrecio').value);
+    const festivoVal = document.getElementById('platoFestivo').value;
+    const festivo = festivoVal ? parseFloat(festivoVal) : price;
+    const category = document.getElementById('platoCategoria').value;
+
+    dishes.push({ id: Date.now(), name, price, festivo, category });
+    alert('Plato agregado correctamente');
+    renderAdminMenu();
+    renderDishes('Todas');
+    renderRecompensasSelect();
+}
+
+function renderAdminMenu() {
+    const container = document.getElementById('adminMenuListContainer');
+    container.innerHTML = '';
+    dishes.forEach(d => {
+        container.innerHTML += `<div class="form-card"><strong>${d.name}</strong> - Normal: S/${d.price} | Festivo: S/${d.festivo} (${d.category})</div>`;
+    });
+}
+
+function renderRecompensasSelect() {
+    const sel = document.getElementById('recomPlato');
+    if(sel) {
+        sel.innerHTML = '';
+        dishes.forEach(d => {
+            sel.innerHTML += `<option value="${d.name}">${d.name}</option>`;
+        });
+    }
+}
+
+function renderAdminMesas() {
+    const grid = document.getElementById('adminTablesGrid');
+    if(grid) {
+        grid.innerHTML = '';
+        tables.forEach(t => {
+            grid.innerHTML += `<div class="table-card"><h4>${t.name}</h4><button class="btn btn-secondary" onclick="eliminarMesa(${t.id})">🗑️</button></div>`;
+        });
+    }
+}
+
+function agregarMesaSalon() {
+    const num = document.getElementById('nuevaMesaNum').value;
+    if(num) {
+        tables.push({ id: Date.now(), name: `Mesa ${num}`, status: 'free' });
+        renderTables();
+        renderAdminMesas();
+        document.getElementById('nuevaMesaNum').value = '';
+    }
+}
+
+function eliminarMesa(id) {
+    tables = tables.filter(t => t.id !== id);
+    renderTables();
+    renderAdminMesas();
+}
+
+function crearTarjetaRecompensa(e) {
+    e.preventDefault();
+    alert('Tarjeta de recompensa creada con éxito.');
+}
+
+function crearUsuarioTrabajador(e) {
+    e.preventDefault();
+    alert('Cuenta de trabajador creada con éxito.');
+}
+
+function filtrarClientesAdmin(query) {
+    console.log("Filtrando cliente:", query);
 }

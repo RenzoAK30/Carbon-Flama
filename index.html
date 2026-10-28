@@ -48,41 +48,34 @@
             </div>
 
             <!-- Mapa Visual de Mesas -->
-            <div class="tables-grid" id="tablesGrid">
-                <!-- Se genera dinámicamente -->
-            </div>
+            <div class="tables-grid" id="tablesGrid"></div>
 
-            <!-- Modal / Interfaz de Toma de Pedidos -->
+            <!-- Interfaz de Toma de Pedidos -->
             <div id="orderSection" class="order-section hidden">
                 <div class="order-header">
                     <h3 id="currentOrderTitle">Tomando Pedido - Mesa 1</h3>
                     <button class="btn-close" onclick="closeOrderSection()">✕</button>
                 </div>
 
-                <!-- Cliente & Fidelización -->
                 <div class="client-loyalty-bar">
-                    <input type="text" id="clientPhone" placeholder="Teléfono del cliente..." />
+                    <input type="text" id="clientPhone" placeholder="Teléfono o DNI del cliente..." />
                     <button class="btn btn-secondary" onclick="buscarOAgregarCliente()">🔍 Buscar / Recompensas</button>
                     <span id="clientLoyaltyStatus" class="loyalty-tag"></span>
                 </div>
 
                 <div class="pos-layout">
-                    <!-- Categorías y Carta -->
                     <div class="menu-container">
                         <div class="categories-bar" id="categoriesBar">
                             <button class="cat-btn active" onclick="filterCategory('Todas')">Todas</button>
                             <button class="cat-btn" onclick="filterCategory('Parrillas')">Parrillas</button>
                             <button class="cat-btn" onclick="filterCategory('Cenas')">Cenas</button>
-                            <button class="cat-btn" onclick="filterCategory('Selváticos')">Selváticos</button>
+                            <button class="cat-btn" onclick="filterCategory('Selvaticos')">Selvaticos</button>
                             <button class="cat-btn" onclick="filterCategory('Guarniciones')">Guarniciones</button>
                             <button class="cat-btn" onclick="filterCategory('Bebidas')">Bebidas</button>
                         </div>
-                        <div class="dishes-grid" id="dishesGrid">
-                            <!-- Se puebla con la carta -->
-                        </div>
+                        <div class="dishes-grid" id="dishesGrid"></div>
                     </div>
 
-                    <!-- Comanda / Ticket Actual -->
                     <div class="cart-container">
                         <h4>Comanda Actual</h4>
                         <div id="cartItems" class="cart-items">
@@ -167,76 +160,211 @@
 
         <!-- ==================== VISTA ADMINISTRADOR ==================== -->
         <section id="view-admin" class="role-view">
-            <h2>Panel de Administración y Finanzas</h2>
-            
-            <div class="dashboard-kpi-grid">
-                <div class="kpi-card">
-                    <h4>Ventas Totales</h4>
-                    <p id="kpiVentasTotal">S/ 0.00</p>
-                </div>
-                <div class="kpi-card danger">
-                    <h4>Gastos Operativos</h4>
-                    <p id="kpiGastosTotal">S/ 0.00</p>
-                </div>
-                <div class="kpi-card success">
-                    <h4>Utilidad Estimada</h4>
-                    <p id="kpiUtilidad">S/ 0.00</p>
-                </div>
+            <div class="admin-top-header">
+                <h2>Administración</h2>
+                <p>Reportes de ventas, gestión de menú, mesas y usuarios.</p>
             </div>
 
-            <div class="admin-tabs">
-                <button class="tab-btn active" onclick="switchAdminTab('finanzas')">💰 Gastos y Finanzas</button>
-                <button class="tab-btn" onclick="switchAdminTab('platos')">🍖 CRUD Platos & Carta Festiva</button>
+            <!-- Pestañas de Administración -->
+            <div class="admin-tabs-bar">
+                <button class="admin-tab-btn active" onclick="switchAdminTab('reportes')">Reportes</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('menu')">Menú</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('clientes')">Clientes</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('recompensas')">Recompensas</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('mesas')">Mesas</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('usuarios')">Usuarios</button>
+                <button class="admin-tab-btn" onclick="switchAdminTab('ajustes')">Ajustes</button>
             </div>
 
-            <!-- Tab Finanzas -->
-            <div id="adminTabFinanzas" class="admin-tab-content active">
+            <!-- 1. TAB REPORTES -->
+            <div id="adminTab-reportes" class="admin-tab-pane active">
+                <div class="dashboard-kpi-grid">
+                    <div class="kpi-card">
+                        <h4>Ventas Totales</h4>
+                        <p id="kpiVentasTotal">S/ 0.00</p>
+                    </div>
+                    <div class="kpi-card danger">
+                        <h4>Gastos Operativos</h4>
+                        <p id="kpiGastosTotal">S/ 0.00</p>
+                    </div>
+                    <div class="kpi-card success">
+                        <h4>Utilidad Neta</h4>
+                        <p id="kpiUtilidad">S/ 0.00</p>
+                    </div>
+                </div>
                 <div class="form-card">
                     <h3>Registrar Gasto del Local</h3>
                     <form id="formGasto" onsubmit="registrarGasto(event)">
-                        <div class="form-group">
-                            <label>Categoría:</label>
+                        <div class="form-row">
                             <select id="gastoCategoria" required>
                                 <option value="Servicios">Servicios (Luz, Agua, Gas)</option>
                                 <option value="Personal">Personal / Planilla</option>
                                 <option value="Alquiler">Alquiler</option>
                                 <option value="Otros">Otros</option>
                             </select>
+                            <input type="text" id="gastoDesc" placeholder="Descripción del gasto..." required />
+                            <input type="number" step="0.10" id="gastoMonto" placeholder="Monto S/" required />
+                            <button type="submit" class="btn btn-primary">+ Agregar Gasto</button>
                         </div>
-                        <div class="form-group">
-                            <label>Descripción:</label>
-                            <input type="text" id="gastoDesc" placeholder="Ej: Pago recibo de luz" required />
+                    </form>
+                </div>
+            </div>
+
+            <!-- 2. TAB MENÚ -->
+            <div id="adminTab-menu" class="admin-tab-pane">
+                <div class="form-card">
+                    <h3>Carta activa</h3>
+                    <p>En días festivos actívala para cobrar los precios de la carta festiva.</p>
+                    <div class="carta-toggle-row">
+                        <span id="lblCartaStatus">NORMAL</span>
+                        <label class="switch">
+                            <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)">
+                            <span class="slider round"></span>
+                        </label>
+                        <span>Festiva</span>
+                    </div>
+                </div>
+
+                <div class="form-card">
+                    <h3>Agregar producto</h3>
+                    <form id="formPlato" onsubmit="agregarPlato(event)">
+                        <div class="form-row">
+                            <input type="text" id="platoNombre" placeholder="Nombre" required />
+                            <input type="number" step="0.10" id="platoPrecio" placeholder="Precio S/" required />
+                            <input type="number" step="0.10" id="platoFestivo" placeholder="Festivo S/" />
+                            <select id="platoCategoria" required>
+                                <option value="Parrillas">Parrillas</option>
+                                <option value="Cenas">Cenas</option>
+                                <option value="Selvaticos">Selvaticos</option>
+                                <option value="Guarniciones">Guarniciones</option>
+                                <option value="Bebidas">Bebidas</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">+ Agregar</button>
                         </div>
-                        <div class="form-group">
-                            <label>Monto (S/):</label>
-                            <input type="number" step="0.10" id="gastoMonto" required />
-                        </div>
-                        <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                        <small>Si no llenas "Festivo", se copiará el precio normal.</small>
                     </form>
                 </div>
 
-                <h3>Historial de Gastos Registrados</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Categoría</th>
-                            <th>Descripción</th>
-                            <th>Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody id="gastosTableBody"></tbody>
-                </table>
+                <div id="adminMenuListContainer"></div>
             </div>
 
-            <!-- Tab Platos -->
-            <div id="adminTabPlatos" class="admin-tab-content">
+            <!-- 3. TAB CLIENTES -->
+            <div id="adminTab-clientes" class="admin-tab-pane">
                 <div class="form-card">
-                    <h3>Administración de Platos</h3>
-                    <p>Puedes cambiar entre Carta Normal o Carta Festiva (aplica recargo automático).</p>
-                    <label>
-                        <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)"> Activar Carta Festiva (+S/ 3.00 en parrillas)
-                    </label>
+                    <div class="header-with-search">
+                        <h3>Clientes</h3>
+                        <input type="text" id="searchClienteInput" placeholder="Buscar por DNI, nombre o teléfono" oninput="filtrarClientesAdmin(this.value)" />
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>DNI / Teléfono</th>
+                                <th>Visitas</th>
+                                <th>Total Gastado</th>
+                                <th>Última visita</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminClientesTableBody">
+                            <tr><td colspan="5" style="text-align:center;">Sin clientes registrados.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. TAB RECOMPENSAS -->
+            <div id="adminTab-recompensas" class="admin-tab-pane">
+                <div class="admin-recompensas-grid">
+                    <div class="form-card">
+                        <h3>Nueva tarjeta de recompensa</h3>
+                        <form onsubmit="crearTarjetaRecompensa(event)">
+                            <div class="form-group">
+                                <label>Nombre</label>
+                                <input type="text" id="recomNombre" placeholder="Ej: Cliente Lomo Saltado" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Plato objetivo</label>
+                                <select id="recomPlato" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Consumos requeridos (umbral)</label>
+                                <input type="number" id="recomUmbral" value="10" min="1" required />
+                                <small>Ej: 10 → el 11.° del mismo plato es gratis.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">+ Crear tarjeta</button>
+                        </form>
+                    </div>
+                    <div class="form-card">
+                        <h3>Tarjetas activas</h3>
+                        <div id="tarjetasRecompensaList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. TAB MESAS -->
+            <div id="adminTab-mesas" class="admin-tab-pane">
+                <div class="form-card">
+                    <h3>Mesas del salón</h3>
+                    <div class="form-row">
+                        <input type="number" id="nuevaMesaNum" placeholder="Número de mesa" />
+                        <button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button>
+                    </div>
+                    <div class="admin-tables-grid" id="adminTablesGrid"></div>
+                </div>
+            </div>
+
+            <!-- 6. TAB USUARIOS -->
+            <div id="adminTab-usuarios" class="admin-tab-pane">
+                <div class="admin-recompensas-grid">
+                    <div class="form-card">
+                        <h3>Crear cuenta de trabajador</h3>
+                        <form onsubmit="crearUsuarioTrabajador(event)">
+                            <div class="form-group">
+                                <label>Nombre completo</label>
+                                <input type="text" id="usrNombre" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Correo / Usuario</label>
+                                <input type="text" id="usrEmail" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Contraseña temporal</label>
+                                <input type="password" id="usrPass" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Rol</label>
+                                <select id="usrRol">
+                                    <option value="mesero">Mesero</option>
+                                    <option value="cocina">Cocina</option>
+                                    <option value="caja">Caja</option>
+                                    <option value="almacen">Almacén</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
+                        </form>
+                    </div>
+                    <div class="form-card">
+                        <h3>Usuarios y roles</h3>
+                        <div id="usuariosListContainer"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. TAB AJUSTES -->
+            <div id="adminTab-ajustes" class="admin-tab-pane">
+                <div class="form-card">
+                    <h3>Configuración de Impresoras (Próximamente)</h3>
+                    <p>Configure las impresoras térmicas de red para comandas automáticas en cocina y caja.</p>
+                    <div class="form-group">
+                        <label>IP de Impresora Cocina</label>
+                        <input type="text" placeholder="192.168.1.100" />
+                    </div>
+                    <div class="form-group">
+                        <label>IP de Impresora Caja</label>
+                        <input type="text" placeholder="192.168.1.101" />
+                    </div>
+                    <button class="btn btn-secondary">Guardar Ajustes</button>
                 </div>
             </div>
         </section>
@@ -272,7 +400,6 @@
 
     </main>
 
-    <!-- Modal Modificador de Acompañamiento -->
-    <div id="modifierModal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Selecciona Opción
+    <script src="app.js"></script>
+</body>
+</html>
