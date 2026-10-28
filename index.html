@@ -19,14 +19,14 @@
             <img src="src/logo.png" alt="Carbón & Flama Logo" class="login-logo" />
             <h2>Carbón & Flama</h2>
             <p>Inicia sesión con tu usuario y contraseña</p>
-            <form onsubmit="handleLogin(event)">
+            <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="form-group">
                     <label>Nombre de Usuario</label>
-                    <input type="text" id="loginUsername" placeholder="Ej: Rcarranza" required />
+                    <input type="text" id="loginUsername" placeholder="Ej: Rcarranza" required autocomplete="username" />
                 </div>
                 <div class="form-group">
                     <label>Contraseña</label>
-                    <input type="password" id="loginPassword" placeholder="••••••••" required />
+                    <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Ingresar al Sistema</button>
             </form>

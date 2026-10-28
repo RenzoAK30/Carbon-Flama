@@ -1,8 +1,12 @@
-// Configuración de Supabase
-const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
+// Configuración de Supabase segura contra redeclaraciones
+if (typeof SUPABASE_URL === 'undefined') {
+    window.SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
+    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
+}
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+if (typeof supabase === 'undefined') {
+    window.supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+}
 
 let currentRole = 'mesero';
 let isCartaFestiva = false;
@@ -44,19 +48,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Autenticación por Nombre de Usuario
 async function handleLogin(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    
     const usuarioInput = document.getElementById('loginUsername').value.trim();
     const passwordInput = document.getElementById('loginPassword').value.trim();
+
+    if (!usuarioInput || !passwordInput) {
+        alert('Por favor completa todos los campos.');
+        return;
+    }
 
     try {
         const { data: perfil, error } = await supabase
             .from('usuarios')
             .select('*')
-            .eq('usuario', usuarioInput)
-            .maybeSingle(); // Usamos maybeSingle para evitar excepciones si no existe
+            .ilike('usuario', usuarioInput)
+            .maybeSingle();
 
         if (error) {
-            alert('Error de conexión con Supabase: ' + error.message);
+            alert('Error al consultar la base de datos: ' + error.message);
             return;
         }
 
@@ -79,44 +89,51 @@ async function handleLogin(event) {
         activarSesion(perfil);
 
     } catch (err) {
-        alert('Ocurrió un error inesperado al iniciar sesión: ' + err.message);
+        alert('Ocurrió un error inesperado: ' + err.message);
     }
 }
 
 function activarSesion(perfil) {
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
+    const loginView = document.getElementById('loginView');
+    const appView = document.getElementById('appView');
+    
+    if (loginView) loginView.classList.add('hidden');
+    if (appView) appView.classList.remove('hidden');
+    
+    const userNameEl = document.getElementById('loggedUserName');
+    if (userNameEl) {
+        userNameEl.innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
+    }
 
     const roleSelect = document.getElementById('roleSelect');
-    if(roleSelect) roleSelect.value = perfil.rol;
+    if (roleSelect) roleSelect.value = perfil.rol;
     
     switchRoleView(perfil.rol);
 }
 
 function handleLogout() {
     localStorage.removeItem('cf_user');
-    document.getElementById('appView').classList.add('hidden');
-    document.getElementById('loginView').classList.remove('hidden');
+    location.reload();
 }
 
 function switchRoleView(role) {
     currentRole = role;
     document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(`view-${role}`);
-    if(target) target.classList.add('active');
+    if (target) target.classList.add('active');
 }
 
 function switchAdminTab(tabName, event) {
     document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
-    if(event) event.currentTarget.classList.add('active');
-    document.getElementById(`adminTab-${tabName}`).classList.add('active');
+    if (event) event.currentTarget.classList.add('active');
+    const pane = document.getElementById(`adminTab-${tabName}`);
+    if (pane) pane.classList.add('active');
 }
 
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
-    if(!grid) return;
+    if (!grid) return;
     grid.innerHTML = '';
     tables.forEach(table => {
         const div = document.createElement('div');
@@ -129,19 +146,22 @@ function renderTables() {
 
 function handleTableClick(table) {
     selectedTable = table;
-    document.getElementById('orderSection').classList.remove('hidden');
-    document.getElementById('currentOrderTitle').innerText = `Tomando Pedido - ${table.name}`;
+    const orderSec = document.getElementById('orderSection');
+    if (orderSec) orderSec.classList.remove('hidden');
+    const title = document.getElementById('currentOrderTitle');
+    if (title) title.innerText = `Tomando Pedido - ${table.name}`;
 }
 
 function closeOrderSection() {
-    document.getElementById('orderSection').classList.add('hidden');
+    const orderSec = document.getElementById('orderSection');
+    if (orderSec) orderSec.classList.add('hidden');
 }
 
 function filterCategory(cat) { renderDishes(cat); }
 
 function renderDishes(cat) {
     const grid = document.getElementById('dishesGrid');
-    if(!grid) return;
+    if (!grid) return;
     grid.innerHTML = '';
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
@@ -162,20 +182,23 @@ function addToCart(dish) {
 
 function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
-    if(!itemsContainer) return;
+    if (!itemsContainer) return;
     itemsContainer.innerHTML = '';
     let subtotal = 0;
     currentOrder.forEach(item => {
         subtotal += item.price;
         itemsContainer.innerHTML += `<div>${item.name} - S/ ${item.price.toFixed(2)}</div>`;
     });
-    document.getElementById('cartSubtotal').innerText = `S/ ${subtotal.toFixed(2)}`;
-    document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
+    const subTotalEl = document.getElementById('cartSubtotal');
+    const totalEl = document.getElementById('cartTotal');
+    if (subTotalEl) subTotalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
+    if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
-    document.getElementById('lblCartaStatus').innerText = isFestiva ? 'FESTIVA' : 'NORMAL';
+    const lbl = document.getElementById('lblCartaStatus');
+    if (lbl) lbl.innerText = isFestiva ? 'FESTIVA' : 'NORMAL';
     renderDishes('Todas');
 }
 
@@ -195,7 +218,7 @@ async function loadFinanzasData() {
     if (gastos) {
         let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
         const kpi = document.getElementById('kpiGastosTotal');
-        if(kpi) kpi.innerText = `S/ ${totalGastos.toFixed(2)}`;
+        if (kpi) kpi.innerText = `S/ ${totalGastos.toFixed(2)}`;
     }
 }
 
@@ -215,7 +238,7 @@ function agregarPlato(event) {
 
 function renderAdminMenu() {
     const container = document.getElementById('adminMenuListContainer');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
     dishes.forEach(d => {
         container.innerHTML += `<div class="form-card"><strong>${d.name}</strong> - Normal: S/${d.price} | Festivo: S/${d.festivo} (${d.category})</div>`;
@@ -224,7 +247,7 @@ function renderAdminMenu() {
 
 function renderAdminMesas() {
     const grid = document.getElementById('adminTablesGrid');
-    if(grid) {
+    if (grid) {
         grid.innerHTML = '';
         tables.forEach(t => {
             grid.innerHTML += `<div class="table-card"><h4>${t.name}</h4><button class="btn btn-secondary btn-sm" onclick="eliminarMesa(${t.id})">🗑️</button></div>`;
@@ -234,7 +257,7 @@ function renderAdminMesas() {
 
 function agregarMesaSalon() {
     const num = document.getElementById('nuevaMesaNum').value;
-    if(num) {
+    if (num) {
         tables.push({ id: Date.now(), name: `Mesa ${num}`, status: 'free' });
         renderTables();
         renderAdminMesas();
@@ -256,7 +279,7 @@ async function crearUsuarioTrabajador(e) {
     const rol = document.getElementById('usrRol').value;
 
     const { error } = await supabase.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
-    if(error) {
+    if (error) {
         alert('Error al crear usuario: ' + error.message);
     } else {
         alert('Trabajador creado con éxito.');
