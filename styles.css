@@ -34,11 +34,13 @@ body {
 .logo {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.8rem;
 }
 
-.flame-icon {
-    font-size: 1.8rem;
+.brand-logo {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
 }
 
 .container {
