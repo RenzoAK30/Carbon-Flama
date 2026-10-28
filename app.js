@@ -121,7 +121,6 @@ async function registrarGasto(event) {
 }
 
 async function loadFinanzasData() {
-    // Obtener gastos de Supabase
     const { data: gastos } = await supabase.from('gastos').select('*');
     if (gastos) {
         const tbody = document.getElementById('gastosTableBody');
