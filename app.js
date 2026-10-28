@@ -1,26 +1,14 @@
-// Configuración correcta del cliente de Supabase v2
+// Configuración de Supabase
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
-// Inicialización segura utilizando el objeto global de Supabase JS v2
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRole = 'mesero';
 let isCartaFestiva = false;
 
-let tables = [
-    { id: 1, name: 'Mesa 1', status: 'free' },
-    { id: 2, name: 'Mesa 2', status: 'occupied' },
-    { id: 3, name: 'Mesa 3', status: 'free' },
-    { id: 4, name: 'Mesa 4', status: 'free' }
-];
-
-let dishes = [
-    { id: 101, name: 'Parrilla Personal', category: 'Parrillas', price: 35.00, festivo: 38.00 },
-    { id: 102, name: 'Churrasco Prime', category: 'Parrillas', price: 42.00, festivo: 45.00 },
-    { id: 103, name: 'Cena Cecina con Tacacho', category: 'Cenas', price: 30.00, festivo: 33.00 },
-    { id: 104, name: 'Inca Kola 1.5L', category: 'Bebidas', price: 12.00, festivo: 12.00 }
-];
+let tables = [];
+let dishes = [];
 
 let currentOrder = [];
 let selectedTable = null;
@@ -36,12 +24,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    renderTables();
-    renderDishes('Todas');
+    cargarDatosDesdeSupabase();
     loadFinanzasData();
-    renderAdminMenu();
-    renderAdminMesas();
 });
+
+// Cargar mesas y platos dinámicamente desde Supabase
+async function cargarDatosDesdeSupabase() {
+    try {
+        // Cargar mesas
+        const { data: dbMesas, error: errMesas } = await supabase.from('mesas').select('*');
+        if (!errMesas && dbMesas) {
+            tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
+        }
+
+        // Cargar platos
+        const { data: dbPlatos, error: errPlatos } = await supabase.from('platos').select('*');
+        if (!errPlatos && dbPlatos) {
+            dishes = dbPlatos.map(p => ({
+                id: p.id,
+                name: p.nombre,
+                category: p.categoria,
+                price: parseFloat(p.precio),
+                festivo: parseFloat(p.festivo)
+            }));
+        }
+
+        renderTables();
+        renderDishes('Todas');
+        renderAdminMenu();
+        renderAdminMesas();
+    } catch (err) {
+        console.error("Error cargando datos de Supabase:", err);
+    }
+}
 
 // Autenticación por Nombre de Usuario
 async function handleLogin(event) {
@@ -56,23 +71,24 @@ async function handleLogin(event) {
     }
 
     try {
-        const { data: perfil, error } = await supabase
+        const { data, error } = await supabase
             .from('usuarios')
             .select('*')
-            .ilike('usuario', usuarioInput)
-            .maybeSingle();
+            .ilike('usuario', usuarioInput);
 
         if (error) {
             alert('Error al consultar la base de datos: ' + error.message);
             return;
         }
 
-        if (!perfil) {
+        if (!data || data.length === 0) {
             alert('El usuario "' + usuarioInput + '" no existe en la base de datos.');
             return;
         }
 
-        if (perfil.password !== passwordInput) {
+        const perfil = data[0];
+
+        if (String(perfil.password).trim() !== String(passwordInput).trim()) {
             alert('Contraseña incorrecta.');
             return;
         }
@@ -219,18 +235,22 @@ async function loadFinanzasData() {
     }
 }
 
-function agregarPlato(event) {
+async function agregarPlato(event) {
     event.preventDefault();
-    const name = document.getElementById('platoNombre').value;
-    const price = parseFloat(document.getElementById('platoPrecio').value);
+    const nombre = document.getElementById('platoNombre').value;
+    const precio = parseFloat(document.getElementById('platoPrecio').value);
     const festivoVal = document.getElementById('platoFestivo').value;
-    const festivo = festivoVal ? parseFloat(festivoVal) : price;
-    const category = document.getElementById('platoCategoria').value;
+    const festivo = festivoVal ? parseFloat(festivoVal) : precio;
+    const categoria = document.getElementById('platoCategoria').value;
 
-    dishes.push({ id: Date.now(), name, price, festivo, category });
-    alert('Plato agregado correctamente');
-    renderAdminMenu();
-    renderDishes('Todas');
+    const { error } = await supabase.from('platos').insert([{ nombre, categoria, precio, festivo }]);
+    if (error) {
+        alert('Error al agregar plato: ' + error.message);
+    } else {
+        alert('Plato agregado correctamente');
+        document.getElementById('formPlato').reset();
+        cargarDatosDesdeSupabase();
+    }
 }
 
 function renderAdminMenu() {
@@ -252,20 +272,27 @@ function renderAdminMesas() {
     }
 }
 
-function agregarMesaSalon() {
+async function agregarMesaSalon() {
     const num = document.getElementById('nuevaMesaNum').value;
     if (num) {
-        tables.push({ id: Date.now(), name: `Mesa ${num}`, status: 'free' });
-        renderTables();
-        renderAdminMesas();
-        document.getElementById('nuevaMesaNum').value = '';
+        const nombre = `Mesa ${num}`;
+        const { error } = await supabase.from('mesas').insert([{ nombre, status: 'free' }]);
+        if (error) {
+            alert('Error al agregar mesa: ' + error.message);
+        } else {
+            document.getElementById('nuevaMesaNum').value = '';
+            cargarDatosDesdeSupabase();
+        }
     }
 }
 
-function eliminarMesa(id) {
-    tables = tables.filter(t => t.id !== id);
-    renderTables();
-    renderAdminMesas();
+async function eliminarMesa(id) {
+    const { error } = await supabase.from('mesas').delete().eq('id', id);
+    if (error) {
+        alert('Error al eliminar mesa: ' + error.message);
+    } else {
+        cargarDatosDesdeSupabase();
+    }
 }
 
 async function crearUsuarioTrabajador(e) {
