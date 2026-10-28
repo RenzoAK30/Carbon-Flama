@@ -1,12 +1,8 @@
-// Configuración de Supabase (Evitando redeclaración)
-if (typeof SUPABASE_URL === 'undefined') {
-    window.SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
-    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
-}
+// Configuración de Supabase
+const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
-if (typeof supabase === 'undefined') {
-    window.supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-}
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRole = 'mesero';
 let isCartaFestiva = false;
@@ -31,8 +27,12 @@ let selectedTable = null;
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
     if (loggedUser) {
-        const perfil = JSON.parse(loggedUser);
-        activarSesion(perfil);
+        try {
+            const perfil = JSON.parse(loggedUser);
+            activarSesion(perfil);
+        } catch (e) {
+            localStorage.removeItem('cf_user');
+        }
     }
 
     renderTables();
@@ -53,16 +53,15 @@ async function handleLogin(event) {
             .from('usuarios')
             .select('*')
             .eq('usuario', usuarioInput)
-            .single();
+            .maybeSingle(); // Usamos maybeSingle para evitar excepciones si no existe
 
         if (error) {
-            console.error("Error de Supabase:", error);
-            alert('Error al conectar con la base de datos: ' + error.message);
+            alert('Error de conexión con Supabase: ' + error.message);
             return;
         }
 
         if (!perfil) {
-            alert('El usuario ingresado no existe en la base de datos.');
+            alert('El usuario "' + usuarioInput + '" no existe en la base de datos.');
             return;
         }
 
@@ -80,8 +79,7 @@ async function handleLogin(event) {
         activarSesion(perfil);
 
     } catch (err) {
-        console.error("Excepción en login:", err);
-        alert('Ocurrió un error inesperado al iniciar sesión.');
+        alert('Ocurrió un error inesperado al iniciar sesión: ' + err.message);
     }
 }
 
@@ -90,7 +88,9 @@ function activarSesion(perfil) {
     document.getElementById('appView').classList.remove('hidden');
     document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
 
-    document.getElementById('roleSelect').value = perfil.rol;
+    const roleSelect = document.getElementById('roleSelect');
+    if(roleSelect) roleSelect.value = perfil.rol;
+    
     switchRoleView(perfil.rol);
 }
 
