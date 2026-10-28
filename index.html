@@ -13,392 +13,419 @@
 </head>
 <body>
 
-    <!-- Selector Global de Roles (Barra Superior) -->
-    <header class="top-bar">
-        <div class="logo">
-            <img src="src/logo.png" alt="Carbón & Flama Logo" class="brand-logo" />
-            <h1>Carbón & Flama</h1>
+    <!-- ==================== VISTA LOGIN ==================== -->
+    <div id="loginView" class="login-container">
+        <div class="login-card">
+            <img src="src/logo.png" alt="Carbón & Flama Logo" class="login-logo" />
+            <h2>Carbón & Flama</h2>
+            <p>Inicia sesión con tu cuenta de trabajador</p>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Correo Electrónico</label>
+                    <input type="email" id="loginEmail" placeholder="correo@carbonflama.com" required />
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Ingresar al Sistema</button>
+            </form>
         </div>
-        <div class="role-selector-container">
-            <label for="roleSelect">Modo de Vista / Rol:</label>
-            <select id="roleSelect" onchange="switchRole(this.value)">
-                <option value="admin">Administrador</option>
-                <option value="mesero" selected>Mesero / Salón</option>
-                <option value="cocina">Cocina (KDS)</option>
-                <option value="caja">Caja & Cobros</option>
-                <option value="almacen">Almacén e Inventario</option>
-            </select>
-        </div>
-    </header>
+    </div>
 
-    <main class="container">
-
-        <!-- ==================== VISTA MESERO ==================== -->
-        <section id="view-mesero" class="role-view active">
-            <div class="salon-header">
-                <h2>Mapa de Mesas</h2>
-                <div class="table-actions">
-                    <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
-                        🔗 Modo Unir Mesas
-                    </button>
-                    <button class="btn btn-primary" onclick="openTakeoutModal()">
-                        🛵 Para Llevar / WhatsApp
-                    </button>
-                </div>
+    <!-- ==================== APLICACIÓN PRINCIPAL ==================== -->
+    <div id="appView" class="hidden">
+        <!-- Selector Global de Roles (Barra Superior) -->
+        <header class="top-bar">
+            <div class="logo">
+                <img src="src/logo.png" alt="Carbón & Flama Logo" class="brand-logo" />
+                <h1>Carbón & Flama</h1>
             </div>
+            <div class="user-info-bar">
+                <span id="loggedUserName">Usuario</span>
+                <div class="role-selector-container">
+                    <label for="roleSelect">Vista / Rol:</label>
+                    <select id="roleSelect" onchange="switchRoleView(this.value)">
+                        <option value="admin">Administrador</option>
+                        <option value="mesero" selected>Mesero / Salón</option>
+                        <option value="cocina">Cocina (KDS)</option>
+                        <option value="caja">Caja & Cobros</option>
+                        <option value="almacen">Almacén e Inventario</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Cerrar Sesión</button>
+            </div>
+        </header>
 
-            <!-- Mapa Visual de Mesas -->
-            <div class="tables-grid" id="tablesGrid"></div>
+        <main class="container">
 
-            <!-- Interfaz de Toma de Pedidos -->
-            <div id="orderSection" class="order-section hidden">
-                <div class="order-header">
-                    <h3 id="currentOrderTitle">Tomando Pedido - Mesa 1</h3>
-                    <button class="btn-close" onclick="closeOrderSection()">✕</button>
+            <!-- ==================== VISTA MESERO ==================== -->
+            <section id="view-mesero" class="role-view active">
+                <div class="salon-header">
+                    <h2>Mapa de Mesas</h2>
+                    <div class="table-actions">
+                        <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
+                            🔗 Modo Unir Mesas
+                        </button>
+                        <button class="btn btn-primary" onclick="openTakeoutModal()">
+                            🛵 Para Llevar / WhatsApp
+                        </button>
+                    </div>
                 </div>
 
-                <div class="client-loyalty-bar">
-                    <input type="text" id="clientPhone" placeholder="Teléfono o DNI del cliente..." />
-                    <button class="btn btn-secondary" onclick="buscarOAgregarCliente()">🔍 Buscar / Recompensas</button>
-                    <span id="clientLoyaltyStatus" class="loyalty-tag"></span>
-                </div>
+                <!-- Mapa Visual de Mesas -->
+                <div class="tables-grid" id="tablesGrid"></div>
 
-                <div class="pos-layout">
-                    <div class="menu-container">
-                        <div class="categories-bar" id="categoriesBar">
-                            <button class="cat-btn active" onclick="filterCategory('Todas')">Todas</button>
-                            <button class="cat-btn" onclick="filterCategory('Parrillas')">Parrillas</button>
-                            <button class="cat-btn" onclick="filterCategory('Cenas')">Cenas</button>
-                            <button class="cat-btn" onclick="filterCategory('Selvaticos')">Selvaticos</button>
-                            <button class="cat-btn" onclick="filterCategory('Guarniciones')">Guarniciones</button>
-                            <button class="cat-btn" onclick="filterCategory('Bebidas')">Bebidas</button>
+                <!-- Interfaz de Toma de Pedidos -->
+                <div id="orderSection" class="order-section hidden">
+                    <div class="order-header">
+                        <h3 id="currentOrderTitle">Tomando Pedido - Mesa 1</h3>
+                        <button class="btn-close" onclick="closeOrderSection()">✕</button>
+                    </div>
+
+                    <div class="client-loyalty-bar">
+                        <input type="text" id="clientPhone" placeholder="Teléfono o DNI del cliente..." />
+                        <button class="btn btn-secondary" onclick="buscarOAgregarCliente()">🔍 Buscar / Recompensas</button>
+                        <span id="clientLoyaltyStatus" class="loyalty-tag"></span>
+                    </div>
+
+                    <div class="pos-layout">
+                        <div class="menu-container">
+                            <div class="categories-bar" id="categoriesBar">
+                                <button class="cat-btn active" onclick="filterCategory('Todas')">Todas</button>
+                                <button class="cat-btn" onclick="filterCategory('Parrillas')">Parrillas</button>
+                                <button class="cat-btn" onclick="filterCategory('Cenas')">Cenas</button>
+                                <button class="cat-btn" onclick="filterCategory('Selvaticos')">Selvaticos</button>
+                                <button class="cat-btn" onclick="filterCategory('Guarniciones')">Guarniciones</button>
+                                <button class="cat-btn" onclick="filterCategory('Bebidas')">Bebidas</button>
+                            </div>
+                            <div class="dishes-grid" id="dishesGrid"></div>
                         </div>
-                        <div class="dishes-grid" id="dishesGrid"></div>
-                    </div>
 
-                    <div class="cart-container">
-                        <h4>Comanda Actual</h4>
-                        <div id="cartItems" class="cart-items">
-                            <p class="empty-msg">No hay ítems seleccionados</p>
+                        <div class="cart-container">
+                            <h4>Comanda Actual</h4>
+                            <div id="cartItems" class="cart-items">
+                                <p class="empty-msg">No hay ítems seleccionados</p>
+                            </div>
+
+                            <div class="cart-summary">
+                                <div class="summary-row">
+                                    <span>Subtotal:</span>
+                                    <span id="cartSubtotal">S/ 0.00</span>
+                                </div>
+                                <div class="summary-row" id="taperRow" style="display:none;">
+                                    <span>Envases / Tápers:</span>
+                                    <span id="cartTapers">S/ 0.00</span>
+                                </div>
+                                <div class="summary-row total">
+                                    <span>Total:</span>
+                                    <span id="cartTotal">S/ 0.00</span>
+                                </div>
+
+                                <div class="split-bill-box">
+                                    <label>
+                                        <input type="checkbox" id="chkSplitBill" onchange="toggleSplitBill(this.checked)" />
+                                        Dividir Cuenta Separada
+                                    </label>
+                                    <input type="number" id="numSplitPersons" min="2" max="10" value="2" style="display:none;" onchange="updateCartUI()" />
+                                </div>
+
+                                <button class="btn btn-success btn-block" onclick="enviarPedidoACocina()">
+                                    👨‍🍳 Enviar Pedido a Cocina
+                                </button>
+                            </div>
                         </div>
-
-                        <div class="cart-summary">
-                            <div class="summary-row">
-                                <span>Subtotal:</span>
-                                <span id="cartSubtotal">S/ 0.00</span>
-                            </div>
-                            <div class="summary-row" id="taperRow" style="display:none;">
-                                <span>Envases / Tápers:</span>
-                                <span id="cartTapers">S/ 0.00</span>
-                            </div>
-                            <div class="summary-row total">
-                                <span>Total:</span>
-                                <span id="cartTotal">S/ 0.00</span>
-                            </div>
-
-                            <div class="split-bill-box">
-                                <label>
-                                    <input type="checkbox" id="chkSplitBill" onchange="toggleSplitBill(this.checked)" />
-                                    Dividir Cuenta Separada
-                                </label>
-                                <input type="number" id="numSplitPersons" min="2" max="10" value="2" style="display:none;" onchange="updateCartUI()" />
-                            </div>
-
-                            <button class="btn btn-success btn-block" onclick="enviarPedidoACocina()">
-                                👨‍🍳 Enviar Pedido a Cocina
-                            </button>
-                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- ==================== VISTA COCINA (KDS) ==================== -->
-        <section id="view-cocina" class="role-view">
-            <h2>Pantalla de Cocina (KDS)</h2>
-            <div class="kds-board">
-                <div class="kds-column">
-                    <div class="kds-column-header bg-pending">Pendiente</div>
-                    <div id="kdsPending" class="kds-list"></div>
-                </div>
-                <div class="kds-column">
-                    <div class="kds-column-header bg-preparing">En Preparación</div>
-                    <div id="kdsPreparing" class="kds-list"></div>
-                </div>
-                <div class="kds-column">
-                    <div class="kds-column-header bg-delivered">Entregado</div>
-                    <div id="kdsDelivered" class="kds-list"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== VISTA CAJA ==================== -->
-        <section id="view-caja" class="role-view">
-            <h2>Caja y Emisión de Comprobantes</h2>
-            <div class="caja-grid">
-                <div class="caja-tables-list">
-                    <h3>Mesas Ocupadas por Cobrar</h3>
-                    <div id="cajaPendingList" class="cards-list"></div>
-                </div>
-                <div class="caja-checkout" id="checkoutPanel" style="display:none;">
-                    <h3>Cobrar Comanda</h3>
-                    <div id="checkoutDetails"></div>
-                    <div class="payment-method-selector">
-                        <label>Método de Pago:</label>
-                        <select id="paymentMethod">
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Yape/Plin">Yape / Plin</option>
-                            <option value="Tarjeta">Tarjeta de Débito/Crédito</option>
-                        </select>
+            <!-- ==================== VISTA COCINA (KDS) ==================== -->
+            <section id="view-cocina" class="role-view">
+                <h2>Pantalla de Cocina (KDS)</h2>
+                <div class="kds-board">
+                    <div class="kds-column">
+                        <div class="kds-column-header bg-pending">Pendiente</div>
+                        <div id="kdsPending" class="kds-list"></div>
                     </div>
-                    <button class="btn btn-success btn-block" onclick="procesarPago()">
-                        💳 Emitir Comprobante y Cerrar Cuenta
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== VISTA ADMINISTRADOR ==================== -->
-        <section id="view-admin" class="role-view">
-            <div class="admin-top-header">
-                <h2>Administración</h2>
-                <p>Reportes de ventas, gestión de menú, mesas y usuarios.</p>
-            </div>
-
-            <!-- Pestañas de Administración -->
-            <div class="admin-tabs-bar">
-                <button class="admin-tab-btn active" onclick="switchAdminTab('reportes')">Reportes</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('menu')">Menú</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('clientes')">Clientes</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('recompensas')">Recompensas</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('mesas')">Mesas</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('usuarios')">Usuarios</button>
-                <button class="admin-tab-btn" onclick="switchAdminTab('ajustes')">Ajustes</button>
-            </div>
-
-            <!-- 1. TAB REPORTES -->
-            <div id="adminTab-reportes" class="admin-tab-pane active">
-                <div class="dashboard-kpi-grid">
-                    <div class="kpi-card">
-                        <h4>Ventas Totales</h4>
-                        <p id="kpiVentasTotal">S/ 0.00</p>
+                    <div class="kds-column">
+                        <div class="kds-column-header bg-preparing">En Preparación</div>
+                        <div id="kdsPreparing" class="kds-list"></div>
                     </div>
-                    <div class="kpi-card danger">
-                        <h4>Gastos Operativos</h4>
-                        <p id="kpiGastosTotal">S/ 0.00</p>
-                    </div>
-                    <div class="kpi-card success">
-                        <h4>Utilidad Neta</h4>
-                        <p id="kpiUtilidad">S/ 0.00</p>
+                    <div class="kds-column">
+                        <div class="kds-column-header bg-delivered">Entregado</div>
+                        <div id="kdsDelivered" class="kds-list"></div>
                     </div>
                 </div>
-                <div class="form-card">
-                    <h3>Registrar Gasto del Local</h3>
-                    <form id="formGasto" onsubmit="registrarGasto(event)">
-                        <div class="form-row">
-                            <select id="gastoCategoria" required>
-                                <option value="Servicios">Servicios (Luz, Agua, Gas)</option>
-                                <option value="Personal">Personal / Planilla</option>
-                                <option value="Alquiler">Alquiler</option>
-                                <option value="Otros">Otros</option>
+            </section>
+
+            <!-- ==================== VISTA CAJA ==================== -->
+            <section id="view-caja" class="role-view">
+                <h2>Caja y Emisión de Comprobantes</h2>
+                <div class="caja-grid">
+                    <div class="caja-tables-list">
+                        <h3>Mesas Ocupadas por Cobrar</h3>
+                        <div id="cajaPendingList" class="cards-list"></div>
+                    </div>
+                    <div class="caja-checkout" id="checkoutPanel" style="display:none;">
+                        <h3>Cobrar Comanda</h3>
+                        <div id="checkoutDetails"></div>
+                        <div class="payment-method-selector">
+                            <label>Método de Pago:</label>
+                            <select id="paymentMethod">
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Yape/Plin">Yape / Plin</option>
+                                <option value="Tarjeta">Tarjeta de Débito/Crédito</option>
                             </select>
-                            <input type="text" id="gastoDesc" placeholder="Descripción del gasto..." required />
-                            <input type="number" step="0.10" id="gastoMonto" placeholder="Monto S/" required />
-                            <button type="submit" class="btn btn-primary">+ Agregar Gasto</button>
                         </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- 2. TAB MENÚ -->
-            <div id="adminTab-menu" class="admin-tab-pane">
-                <div class="form-card">
-                    <h3>Carta activa</h3>
-                    <p>En días festivos actívala para cobrar los precios de la carta festiva.</p>
-                    <div class="carta-toggle-row">
-                        <span id="lblCartaStatus">NORMAL</span>
-                        <label class="switch">
-                            <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)">
-                            <span class="slider round"></span>
-                        </label>
-                        <span>Festiva</span>
+                        <button class="btn btn-success btn-block" onclick="procesarPago()">
+                            💳 Emitir Comprobante y Cerrar Cuenta
+                        </button>
                     </div>
                 </div>
+            </section>
 
-                <div class="form-card">
-                    <h3>Agregar producto</h3>
-                    <form id="formPlato" onsubmit="agregarPlato(event)">
-                        <div class="form-row">
-                            <input type="text" id="platoNombre" placeholder="Nombre" required />
-                            <input type="number" step="0.10" id="platoPrecio" placeholder="Precio S/" required />
-                            <input type="number" step="0.10" id="platoFestivo" placeholder="Festivo S/" />
-                            <select id="platoCategoria" required>
-                                <option value="Parrillas">Parrillas</option>
-                                <option value="Cenas">Cenas</option>
-                                <option value="Selvaticos">Selvaticos</option>
-                                <option value="Guarniciones">Guarniciones</option>
-                                <option value="Bebidas">Bebidas</option>
-                            </select>
-                            <button type="submit" class="btn btn-primary">+ Agregar</button>
+            <!-- ==================== VISTA ADMINISTRADOR ==================== -->
+            <section id="view-admin" class="role-view">
+                <div class="admin-top-header">
+                    <h2>Administración</h2>
+                    <p>Reportes de ventas, gestión de menú, mesas y usuarios.</p>
+                </div>
+
+                <!-- Pestañas de Administración -->
+                <div class="admin-tabs-bar">
+                    <button class="admin-tab-btn active" onclick="switchAdminTab('reportes', event)">Reportes</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('menu', event)">Menú</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('clientes', event)">Clientes</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('recompensas', event)">Recompensas</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('mesas', event)">Mesas</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('usuarios', event)">Usuarios</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('ajustes', event)">Ajustes</button>
+                </div>
+
+                <!-- 1. TAB REPORTES -->
+                <div id="adminTab-reportes" class="admin-tab-pane active">
+                    <div class="dashboard-kpi-grid">
+                        <div class="kpi-card">
+                            <h4>Ventas Totales</h4>
+                            <p id="kpiVentasTotal">S/ 0.00</p>
                         </div>
-                        <small>Si no llenas "Festivo", se copiará el precio normal.</small>
-                    </form>
-                </div>
-
-                <div id="adminMenuListContainer"></div>
-            </div>
-
-            <!-- 3. TAB CLIENTES -->
-            <div id="adminTab-clientes" class="admin-tab-pane">
-                <div class="form-card">
-                    <div class="header-with-search">
-                        <h3>Clientes</h3>
-                        <input type="text" id="searchClienteInput" placeholder="Buscar por DNI, nombre o teléfono" oninput="filtrarClientesAdmin(this.value)" />
-                    </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>DNI / Teléfono</th>
-                                <th>Visitas</th>
-                                <th>Total Gastado</th>
-                                <th>Última visita</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminClientesTableBody">
-                            <tr><td colspan="5" style="text-align:center;">Sin clientes registrados.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 4. TAB RECOMPENSAS -->
-            <div id="adminTab-recompensas" class="admin-tab-pane">
-                <div class="admin-recompensas-grid">
-                    <div class="form-card">
-                        <h3>Nueva tarjeta de recompensa</h3>
-                        <form onsubmit="crearTarjetaRecompensa(event)">
-                            <div class="form-group">
-                                <label>Nombre</label>
-                                <input type="text" id="recomNombre" placeholder="Ej: Cliente Lomo Saltado" required />
-                            </div>
-                            <div class="form-group">
-                                <label>Plato objetivo</label>
-                                <select id="recomPlato" required></select>
-                            </div>
-                            <div class="form-group">
-                                <label>Consumos requeridos (umbral)</label>
-                                <input type="number" id="recomUmbral" value="10" min="1" required />
-                                <small>Ej: 10 → el 11.° del mismo plato es gratis.</small>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-block">+ Crear tarjeta</button>
-                        </form>
+                        <div class="kpi-card danger">
+                            <h4>Gastos Operativos</h4>
+                            <p id="kpiGastosTotal">S/ 0.00</p>
+                        </div>
+                        <div class="kpi-card success">
+                            <h4>Utilidad Neta</h4>
+                            <p id="kpiUtilidad">S/ 0.00</p>
+                        </div>
                     </div>
                     <div class="form-card">
-                        <h3>Tarjetas activas</h3>
-                        <div id="tarjetasRecompensaList"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. TAB MESAS -->
-            <div id="adminTab-mesas" class="admin-tab-pane">
-                <div class="form-card">
-                    <h3>Mesas del salón</h3>
-                    <div class="form-row">
-                        <input type="number" id="nuevaMesaNum" placeholder="Número de mesa" />
-                        <button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button>
-                    </div>
-                    <div class="admin-tables-grid" id="adminTablesGrid"></div>
-                </div>
-            </div>
-
-            <!-- 6. TAB USUARIOS -->
-            <div id="adminTab-usuarios" class="admin-tab-pane">
-                <div class="admin-recompensas-grid">
-                    <div class="form-card">
-                        <h3>Crear cuenta de trabajador</h3>
-                        <form onsubmit="crearUsuarioTrabajador(event)">
-                            <div class="form-group">
-                                <label>Nombre completo</label>
-                                <input type="text" id="usrNombre" required />
-                            </div>
-                            <div class="form-group">
-                                <label>Correo / Usuario</label>
-                                <input type="text" id="usrEmail" required />
-                            </div>
-                            <div class="form-group">
-                                <label>Contraseña temporal</label>
-                                <input type="password" id="usrPass" required />
-                            </div>
-                            <div class="form-group">
-                                <label>Rol</label>
-                                <select id="usrRol">
-                                    <option value="mesero">Mesero</option>
-                                    <option value="cocina">Cocina</option>
-                                    <option value="caja">Caja</option>
-                                    <option value="almacen">Almacén</option>
-                                    <option value="admin">Administrador</option>
+                        <h3>Registrar Gasto del Local</h3>
+                        <form id="formGasto" onsubmit="registrarGasto(event)">
+                            <div class="form-row">
+                                <select id="gastoCategoria" required>
+                                    <option value="Servicios">Servicios (Luz, Agua, Gas)</option>
+                                    <option value="Personal">Personal / Planilla</option>
+                                    <option value="Alquiler">Alquiler</option>
+                                    <option value="Otros">Otros</option>
                                 </select>
+                                <input type="text" id="gastoDesc" placeholder="Descripción del gasto..." required />
+                                <input type="number" step="0.10" id="gastoMonto" placeholder="Monto S/" required />
+                                <button type="submit" class="btn btn-primary">+ Agregar Gasto</button>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
                         </form>
                     </div>
+                </div>
+
+                <!-- 2. TAB MENÚ -->
+                <div id="adminTab-menu" class="admin-tab-pane">
                     <div class="form-card">
-                        <h3>Usuarios y roles</h3>
-                        <div id="usuariosListContainer"></div>
+                        <h3>Carta activa</h3>
+                        <p>En días festivos actívala para cobrar los precios de la carta festiva.</p>
+                        <div class="carta-toggle-row">
+                            <span id="lblCartaStatus">NORMAL</span>
+                            <label class="switch">
+                                <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)">
+                                <span class="slider round"></span>
+                            </label>
+                            <span>Festiva</span>
+                        </div>
+                    </div>
+
+                    <div class="form-card">
+                        <h3>Agregar producto</h3>
+                        <form id="formPlato" onsubmit="agregarPlato(event)">
+                            <div class="form-row">
+                                <input type="text" id="platoNombre" placeholder="Nombre" required />
+                                <input type="number" step="0.10" id="platoPrecio" placeholder="Precio S/" required />
+                                <input type="number" step="0.10" id="platoFestivo" placeholder="Festivo S/" />
+                                <select id="platoCategoria" required>
+                                    <option value="Parrillas">Parrillas</option>
+                                    <option value="Cenas">Cenas</option>
+                                    <option value="Selvaticos">Selváticos</option>
+                                    <option value="Guarniciones">Guarniciones</option>
+                                    <option value="Bebidas">Bebidas</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary">+ Agregar</button>
+                            </div>
+                            <small>Si no llenas "Festivo", se copiará el precio normal.</small>
+                        </form>
+                    </div>
+
+                    <div id="adminMenuListContainer"></div>
+                </div>
+
+                <!-- 3. TAB CLIENTES -->
+                <div id="adminTab-clientes" class="admin-tab-pane">
+                    <div class="form-card">
+                        <div class="header-with-search">
+                            <h3>Clientes</h3>
+                            <input type="text" id="searchClienteInput" placeholder="Buscar por DNI, nombre o teléfono" oninput="filtrarClientesAdmin(this.value)" />
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>DNI / Teléfono</th>
+                                    <th>Visitas</th>
+                                    <th>Total Gastado</th>
+                                    <th>Última visita</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminClientesTableBody">
+                                <tr><td colspan="5" style="text-align:center;">Sin clientes registrados.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- 7. TAB AJUSTES -->
-            <div id="adminTab-ajustes" class="admin-tab-pane">
-                <div class="form-card">
-                    <h3>Configuración de Impresoras (Próximamente)</h3>
-                    <p>Configure las impresoras térmicas de red para comandas automáticas en cocina y caja.</p>
-                    <div class="form-group">
-                        <label>IP de Impresora Cocina</label>
-                        <input type="text" placeholder="192.168.1.100" />
+                <!-- 4. TAB RECOMPENSAS -->
+                <div id="adminTab-recompensas" class="admin-tab-pane">
+                    <div class="admin-recompensas-grid">
+                        <div class="form-card">
+                            <h3>Nueva tarjeta de recompensa</h3>
+                            <form onsubmit="crearTarjetaRecompensa(event)">
+                                <div class="form-group">
+                                    <label>Nombre</label>
+                                    <input type="text" id="recomNombre" placeholder="Ej: Cliente Lomo Saltado" required />
+                                </div>
+                                <div class="form-group">
+                                    <label>Plato objetivo</label>
+                                    <select id="recomPlato" required></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Consumos requeridos (umbral)</label>
+                                    <input type="number" id="recomUmbral" value="10" min="1" required />
+                                    <small>Ej: 10 → el 11.° del mismo plato es gratis.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">+ Crear tarjeta</button>
+                            </form>
+                        </div>
+                        <div class="form-card">
+                            <h3>Tarjetas activas</h3>
+                            <div id="tarjetasRecompensaList"></div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>IP de Impresora Caja</label>
-                        <input type="text" placeholder="192.168.1.101" />
-                    </div>
-                    <button class="btn btn-secondary">Guardar Ajustes</button>
                 </div>
-            </div>
-        </section>
 
-        <!-- ==================== VISTA ALMACÉN ==================== -->
-        <section id="view-almacen" class="role-view">
-            <h2>Control de Inventario y Almacén</h2>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Insumo / Producto</th>
-                        <th>Stock Actual</th>
-                        <th>Mínimo Requerido</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="almacenTableBody">
-                    <tr>
-                        <td>Carne de Lomo (kg)</td>
-                        <td>15.5 kg</td>
-                        <td>5.0 kg</td>
-                        <td><span class="badge badge-success">OK</span></td>
-                    </tr>
-                    <tr>
-                        <td>Envases / Tápers</td>
-                        <td>8 unidades</td>
-                        <td>20 unidades</td>
-                        <td><span class="badge badge-danger">Stock Bajo</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <!-- 5. TAB MESAS -->
+                <div id="adminTab-mesas" class="admin-tab-pane">
+                    <div class="form-card">
+                        <h3>Mesas del salón</h3>
+                        <div class="form-row">
+                            <input type="number" id="nuevaMesaNum" placeholder="Número de mesa" />
+                            <button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button>
+                        </div>
+                        <div class="admin-tables-grid" id="adminTablesGrid"></div>
+                    </div>
+                </div>
 
-    </main>
+                <!-- 6. TAB USUARIOS -->
+                <div id="adminTab-usuarios" class="admin-tab-pane">
+                    <div class="admin-recompensas-grid">
+                        <div class="form-card">
+                            <h3>Crear cuenta de trabajador</h3>
+                            <form onsubmit="crearUsuarioTrabajador(event)">
+                                <div class="form-group">
+                                    <label>Nombre completo</label>
+                                    <input type="text" id="usrNombre" required />
+                                </div>
+                                <div class="form-group">
+                                    <label>Correo / Usuario</label>
+                                    <input type="text" id="usrEmail" required />
+                                </div>
+                                <div class="form-group">
+                                    <label>Contraseña temporal</label>
+                                    <input type="password" id="usrPass" required />
+                                </div>
+                                <div class="form-group">
+                                    <label>Rol</label>
+                                    <select id="usrRol">
+                                        <option value="mesero">Mesero</option>
+                                        <option value="cocina">Cocina</option>
+                                        <option value="caja">Caja</option>
+                                        <option value="almacen">Almacén</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
+                            </form>
+                        </div>
+                        <div class="form-card">
+                            <h3>Usuarios y roles</h3>
+                            <div id="usuariosListContainer"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. TAB AJUSTES -->
+                <div id="adminTab-ajustes" class="admin-tab-pane">
+                    <div class="form-card">
+                        <h3>Configuración de Impresoras (Próximamente)</h3>
+                        <p>Configure las impresoras térmicas de red para comandas automáticas en cocina y caja.</p>
+                        <div class="form-group">
+                            <label>IP de Impresora Cocina</label>
+                            <input type="text" placeholder="192.168.1.100" />
+                        </div>
+                        <div class="form-group">
+                            <label>IP de Impresora Caja</label>
+                            <input type="text" placeholder="192.168.1.101" />
+                        </div>
+                        <button class="btn btn-secondary">Guardar Ajustes</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== VISTA ALMACÉN ==================== -->
+            <section id="view-almacen" class="role-view">
+                <h2>Control de Inventario y Almacén</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Insumo / Producto</th>
+                            <th>Stock Actual</th>
+                            <th>Mínimo Requerido</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="almacenTableBody">
+                        <tr>
+                            <td>Carne de Lomo (kg)</td>
+                            <td>15.5 kg</td>
+                            <td>5.0 kg</td>
+                            <td><span class="badge badge-success">OK</span></td>
+                        </tr>
+                        <tr>
+                            <td>Envases / Tápers</td>
+                            <td>8 unidades</td>
+                            <td>20 unidades</td>
+                            <td><span class="badge badge-danger">Stock Bajo</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+        </main>
+    </div>
 
     <script src="app.js"></script>
 </body>

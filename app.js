@@ -1,3 +1,4 @@
+// Configuración de Supabase
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
@@ -23,7 +24,13 @@ let dishes = [
 let currentOrder = [];
 let selectedTable = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Comprobar sesión activa en Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        cargarPerfilYPermisos(session.user.id);
+    }
+
     renderTables();
     renderDishes('Todas');
     loadFinanzasData();
@@ -32,21 +39,73 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAdminMesas();
 });
 
-function switchRole(role) {
-    currentRole = role;
-    document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
-    document.getElementById(`view-${role}`).classList.add('active');
+// Autenticación de Usuario
+async function handleLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+        alert('Error al iniciar sesión: ' + error.message);
+        return;
+    }
+
+    cargarPerfilYPermisos(data.user.id);
 }
 
-function switchAdminTab(tabName) {
+async function cargarPerfilYPermisos(userId) {
+    const { data: perfil, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+    if (error || !perfil) {
+        // Si no hay perfil en la DB personalizada pero sí en auth, dar acceso por defecto
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+        document.getElementById('loggedUserName').innerText = "Usuario Autenticado";
+        return;
+    }
+
+    if (!perfil.activo) {
+        alert('Tu cuenta se encuentra desactivada. Contacta al administrador.');
+        await supabase.auth.signOut();
+        return;
+    }
+
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('appView').classList.remove('hidden');
+    document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
+
+    switchRoleView(perfil.rol);
+}
+
+async function handleLogout() {
+    await supabase.auth.signOut();
+    document.getElementById('appView').classList.add('hidden');
+    document.getElementById('loginView').classList.remove('hidden');
+}
+
+function switchRoleView(role) {
+    currentRole = role;
+    document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById(`view-${role}`);
+    if(target) target.classList.add('active');
+}
+
+function switchAdminTab(tabName, event) {
     document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if(event) event.currentTarget.classList.add('active');
     document.getElementById(`adminTab-${tabName}`).classList.add('active');
 }
 
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
+    if(!grid) return;
     grid.innerHTML = '';
     tables.forEach(table => {
         const div = document.createElement('div');
@@ -73,6 +132,7 @@ function filterCategory(cat) {
 
 function renderDishes(cat) {
     const grid = document.getElementById('dishesGrid');
+    if(!grid) return;
     grid.innerHTML = '';
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
@@ -149,6 +209,7 @@ function agregarPlato(event) {
 
 function renderAdminMenu() {
     const container = document.getElementById('adminMenuListContainer');
+    if(!container) return;
     container.innerHTML = '';
     dishes.forEach(d => {
         container.innerHTML += `<div class="form-card"><strong>${d.name}</strong> - Normal: S/${d.price} | Festivo: S/${d.festivo} (${d.category})</div>`;
@@ -170,7 +231,7 @@ function renderAdminMesas() {
     if(grid) {
         grid.innerHTML = '';
         tables.forEach(t => {
-            grid.innerHTML += `<div class="table-card"><h4>${t.name}</h4><button class="btn btn-secondary" onclick="eliminarMesa(${t.id})">🗑️</button></div>`;
+            grid.innerHTML += `<div class="table-card"><h4>${t.name}</h4><button class="btn btn-secondary btn-sm" onclick="eliminarMesa(${t.id})">🗑️</button></div>`;
         });
     }
 }
