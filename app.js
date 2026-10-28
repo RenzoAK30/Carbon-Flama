@@ -41,31 +41,45 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleLogin(event) {
     event.preventDefault();
     const usuarioInput = document.getElementById('loginUsername').value.trim();
-    const passwordInput = document.getElementById('loginPassword').value;
+    const passwordInput = document.getElementById('loginPassword').value.trim();
 
-    const { data: perfil, error } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('usuario', usuarioInput)
-        .single();
+    console.log("Intentando iniciar sesión con usuario:", usuarioInput);
 
-    if (error || !perfil) {
-        alert('Usuario no encontrado en el sistema.');
-        return;
+    try {
+        const { data: perfil, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('usuario', usuarioInput)
+            .single();
+
+        if (error) {
+            console.error("Error de Supabase:", error);
+            alert('Error al conectar con la base de datos: ' + error.message);
+            return;
+        }
+
+        if (!perfil) {
+            alert('El usuario ingresado no existe en la base de datos.');
+            return;
+        }
+
+        if (perfil.password !== passwordInput) {
+            alert('Contraseña incorrecta.');
+            return;
+        }
+
+        if (!perfil.activo) {
+            alert('Tu cuenta se encuentra desactivada.');
+            return;
+        }
+
+        localStorage.setItem('cf_user', JSON.stringify(perfil));
+        activarSesion(perfil);
+
+    } catch (err) {
+        console.error("Excepción en login:", err);
+        alert('Ocurrió un error inesperado al iniciar sesión.');
     }
-
-    if (perfil.password !== passwordInput) {
-        alert('Contraseña incorrecta.');
-        return;
-    }
-
-    if (!perfil.activo) {
-        alert('Tu cuenta se encuentra desactivada.');
-        return;
-    }
-
-    localStorage.setItem('cf_user', JSON.stringify(perfil));
-    activarSesion(perfil);
 }
 
 function activarSesion(perfil) {
@@ -73,7 +87,6 @@ function activarSesion(perfil) {
     document.getElementById('appView').classList.remove('hidden');
     document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
 
-    // Ajustar rol por defecto
     document.getElementById('roleSelect').value = perfil.rol;
     switchRoleView(perfil.rol);
 }
@@ -146,6 +159,7 @@ function addToCart(dish) {
 
 function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
+    if(!itemsContainer) return;
     itemsContainer.innerHTML = '';
     let subtotal = 0;
     currentOrder.forEach(item => {
@@ -177,7 +191,8 @@ async function loadFinanzasData() {
     const { data: gastos } = await supabase.from('gastos').select('*');
     if (gastos) {
         let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
-        document.getElementById('kpiGastosTotal').innerText = `S/ ${totalGastos.toFixed(2)}`;
+        const kpi = document.getElementById('kpiGastosTotal');
+        if(kpi) kpi.innerText = `S/ ${totalGastos.toFixed(2)}`;
     }
 }
 
