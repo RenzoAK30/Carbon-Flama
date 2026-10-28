@@ -34,11 +34,13 @@ body {
 .logo {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.8rem;
 }
 
-.flame-icon {
-    font-size: 1.8rem;
+.brand-logo {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
 }
 
 .container {
@@ -53,8 +55,64 @@ body {
     display: block;
 }
 
-/* Tablas Mesero */
-.tables-grid {
+/* Administración Tabs */
+.admin-tabs-bar {
+    display: flex;
+    gap: 0.5rem;
+    background: #111217;
+    padding: 0.5rem;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+}
+
+.admin-tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.admin-tab-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.admin-tab-pane {
+    display: none;
+}
+
+.admin-tab-pane.active {
+    display: block;
+}
+
+.form-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    align-items: center;
+}
+
+.form-row input, .form-row select, .form-group input, .form-group select {
+    flex: 1;
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: #1e1e24;
+    color: #fff;
+}
+
+.tables-grid, .admin-tables-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 1.5rem;
@@ -68,19 +126,12 @@ body {
     text-align: center;
     cursor: pointer;
     border: 3px solid var(--accent-green);
-    transition: transform 0.2s;
 }
 
 .table-card.occupied {
     border-color: var(--accent-red);
 }
 
-.table-card.selected-for-join {
-    border-color: var(--accent-yellow);
-    box-shadow: 0 0 10px var(--accent-yellow);
-}
-
-/* Layout POS */
 .pos-layout {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -103,36 +154,12 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.dish-card:hover {
-    border-color: var(--primary-color);
-}
-
 .cart-container {
     background: var(--card-bg);
     padding: 1rem;
     border-radius: 12px;
 }
 
-/* KDS */
-.kds-board {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.kds-column-header {
-    padding: 0.8rem;
-    font-weight: bold;
-    text-align: center;
-    border-radius: 6px;
-}
-
-.bg-pending { background-color: var(--accent-yellow); color: #000; }
-.bg-preparing { background-color: var(--primary-color); }
-.bg-delivered { background-color: var(--accent-green); }
-
-/* Dashboard KPI */
 .dashboard-kpi-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -150,7 +177,6 @@ body {
 .kpi-card.danger { border-left-color: var(--accent-red); }
 .kpi-card.success { border-left-color: var(--accent-green); }
 
-/* Utility Classes */
 .btn {
     padding: 0.6rem 1.2rem;
     border: none;
@@ -164,21 +190,16 @@ body {
 .btn-success { background: var(--accent-green); color: #fff; }
 .btn-block { width: 100%; margin-top: 1rem; }
 
+.data-table {
+    width: 100%;
+    margin-top: 1rem;
+    border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+    padding: 0.8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
 .hidden { display: none !important; }
-
-/* Modales */
-.modal {
-    position: fixed;
-    top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background: var(--card-bg);
-    padding: 2rem;
-    border-radius: 12px;
-    min-width: 320px;
-}
