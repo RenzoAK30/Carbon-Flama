@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carbón & Flama - Sistema POS & Gestión</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="src/logo.ico">
     <link rel="stylesheet" href="styles.css">
     <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -14,7 +16,7 @@
     <!-- Selector Global de Roles (Barra Superior) -->
     <header class="top-bar">
         <div class="logo">
-            <span class="flame-icon">🔥</span>
+            <img src="src/logo.png" alt="Carbón & Flama Logo" class="brand-logo" />
             <h1>Carbón & Flama</h1>
         </div>
         <div class="role-selector-container">
@@ -273,12 +275,4 @@
     <!-- Modal Modificador de Acompañamiento -->
     <div id="modifierModal" class="modal hidden">
         <div class="modal-content">
-            <h3>Selecciona Opción de Acompañamiento</h3>
-            <div id="modifierOptions" class="modifier-options"></div>
-            <button class="btn btn-secondary" onclick="closeModifierModal()">Cancelar</button>
-        </div>
-    </div>
-
-    <script src="app.js"></script>
-</body>
-</html>
+            <h3>Selecciona Opción
