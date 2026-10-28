@@ -1,4 +1,3 @@
-// Configuración de Supabase
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
@@ -24,67 +23,63 @@ let dishes = [
 let currentOrder = [];
 let selectedTable = null;
 
-document.addEventListener('DOMContentLoaded', async () => {
-    // Comprobar sesión activa en Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-        cargarPerfilYPermisos(session.user.id);
+document.addEventListener('DOMContentLoaded', () => {
+    const loggedUser = localStorage.getItem('cf_user');
+    if (loggedUser) {
+        const perfil = JSON.parse(loggedUser);
+        activarSesion(perfil);
     }
 
     renderTables();
     renderDishes('Todas');
     loadFinanzasData();
     renderAdminMenu();
-    renderRecompensasSelect();
     renderAdminMesas();
 });
 
-// Autenticación de Usuario
+// Autenticación por Nombre de Usuario
 async function handleLogin(event) {
     event.preventDefault();
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
+    const usuarioInput = document.getElementById('loginUsername').value.trim();
+    const passwordInput = document.getElementById('loginPassword').value;
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-        alert('Error al iniciar sesión: ' + error.message);
-        return;
-    }
-
-    cargarPerfilYPermisos(data.user.id);
-}
-
-async function cargarPerfilYPermisos(userId) {
     const { data: perfil, error } = await supabase
         .from('usuarios')
         .select('*')
-        .eq('id', userId)
+        .eq('usuario', usuarioInput)
         .single();
 
     if (error || !perfil) {
-        // Si no hay perfil en la DB personalizada pero sí en auth, dar acceso por defecto
-        document.getElementById('loginView').classList.add('hidden');
-        document.getElementById('appView').classList.remove('hidden');
-        document.getElementById('loggedUserName').innerText = "Usuario Autenticado";
+        alert('Usuario no encontrado en el sistema.');
+        return;
+    }
+
+    if (perfil.password !== passwordInput) {
+        alert('Contraseña incorrecta.');
         return;
     }
 
     if (!perfil.activo) {
-        alert('Tu cuenta se encuentra desactivada. Contacta al administrador.');
-        await supabase.auth.signOut();
+        alert('Tu cuenta se encuentra desactivada.');
         return;
     }
 
+    localStorage.setItem('cf_user', JSON.stringify(perfil));
+    activarSesion(perfil);
+}
+
+function activarSesion(perfil) {
     document.getElementById('loginView').classList.add('hidden');
     document.getElementById('appView').classList.remove('hidden');
     document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
 
+    // Ajustar rol por defecto
+    document.getElementById('roleSelect').value = perfil.rol;
     switchRoleView(perfil.rol);
 }
 
-async function handleLogout() {
-    await supabase.auth.signOut();
+function handleLogout() {
+    localStorage.removeItem('cf_user');
     document.getElementById('appView').classList.add('hidden');
     document.getElementById('loginView').classList.remove('hidden');
 }
@@ -126,9 +121,7 @@ function closeOrderSection() {
     document.getElementById('orderSection').classList.add('hidden');
 }
 
-function filterCategory(cat) {
-    renderDishes(cat);
-}
+function filterCategory(cat) { renderDishes(cat); }
 
 function renderDishes(cat) {
     const grid = document.getElementById('dishesGrid');
@@ -155,14 +148,10 @@ function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
     itemsContainer.innerHTML = '';
     let subtotal = 0;
-
     currentOrder.forEach(item => {
         subtotal += item.price;
-        const div = document.createElement('div');
-        div.innerText = `${item.name} - S/ ${item.price.toFixed(2)}`;
-        itemsContainer.appendChild(div);
+        itemsContainer.innerHTML += `<div>${item.name} - S/ ${item.price.toFixed(2)}</div>`;
     });
-
     document.getElementById('cartSubtotal').innerText = `S/ ${subtotal.toFixed(2)}`;
     document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
 }
@@ -204,7 +193,6 @@ function agregarPlato(event) {
     alert('Plato agregado correctamente');
     renderAdminMenu();
     renderDishes('Todas');
-    renderRecompensasSelect();
 }
 
 function renderAdminMenu() {
@@ -214,16 +202,6 @@ function renderAdminMenu() {
     dishes.forEach(d => {
         container.innerHTML += `<div class="form-card"><strong>${d.name}</strong> - Normal: S/${d.price} | Festivo: S/${d.festivo} (${d.category})</div>`;
     });
-}
-
-function renderRecompensasSelect() {
-    const sel = document.getElementById('recomPlato');
-    if(sel) {
-        sel.innerHTML = '';
-        dishes.forEach(d => {
-            sel.innerHTML += `<option value="${d.name}">${d.name}</option>`;
-        });
-    }
 }
 
 function renderAdminMesas() {
@@ -252,16 +230,18 @@ function eliminarMesa(id) {
     renderAdminMesas();
 }
 
-function crearTarjetaRecompensa(e) {
+async function crearUsuarioTrabajador(e) {
     e.preventDefault();
-    alert('Tarjeta de recompensa creada con éxito.');
-}
+    const usuario = document.getElementById('usrUser').value;
+    const nombre_completo = document.getElementById('usrNombre').value;
+    const password = document.getElementById('usrPass').value;
+    const rol = document.getElementById('usrRol').value;
 
-function crearUsuarioTrabajador(e) {
-    e.preventDefault();
-    alert('Cuenta de trabajador creada con éxito.');
-}
-
-function filtrarClientesAdmin(query) {
-    console.log("Filtrando cliente:", query);
+    const { error } = await supabase.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
+    if(error) {
+        alert('Error al crear usuario: ' + error.message);
+    } else {
+        alert('Trabajador creado con éxito.');
+        e.target.reset();
+    }
 }
