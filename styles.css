@@ -26,6 +26,11 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .role-view { display: none; }
 .role-view.active { display: block; }
 
+/* Cabecera de Navegación de Pedidos (Estilo Referencia) */
+.order-nav-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.btn-back { background: var(--card-bg); border: 1px solid var(--border-color); color: #fff; width: 40px; height: 40px; border-radius: 8px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.btn-back:hover { background: var(--border-color); }
+
 /* Modal de Modificadores */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal-card { background: var(--card-bg); padding: 2rem; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -33,10 +38,12 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .modifier-option { display: flex; align-items: center; gap: 0.8rem; background: #1e1e24; padding: 0.8rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); }
 .modifier-option input { accent-color: var(--primary-color); width: 18px; height: 18px; }
 .modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; }
+.mt-2 { margin-top: 0.5rem; }
 .mt-3 { margin-top: 1rem; }
 .text-muted { color: #a0a0a0; font-size: 0.85rem; }
+.text-center { text-align: center; }
 
-/* Estilos específicos para Vista Caja (Estilo Referencia) */
+/* Estilos Vista Caja */
 .caja-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
 .caja-kpi-group { display: flex; gap: 1rem; }
 .caja-kpi-pill { background: var(--card-bg); border: 1px solid var(--border-color); padding: 0.6rem 1.2rem; border-radius: 10px; display: flex; flex-direction: column; align-items: center; min-width: 110px; }

@@ -72,30 +72,29 @@
 
             <!-- ==================== VISTA MESERO ==================== -->
             <section id="view-mesero" class="role-view">
-                <div class="salon-header">
-                    <h2>Mapa de Mesas</h2>
-                    <div class="table-actions">
-                        <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
-                            🔗 Modo Unir Mesas
-                        </button>
-                        <button class="btn btn-primary" onclick="openTakeoutModal()">
-                            🛵 Para Llevar / WhatsApp
-                        </button>
+                
+                <!-- SECCIÓN 1: MAPA DE MESAS (Se oculta al seleccionar una mesa) -->
+                <div id="salonMapSection">
+                    <div class="salon-header">
+                        <h2>Mapa de Mesas</h2>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
+                                🔗 Modo Unir Mesas
+                            </button>
+                            <button class="btn btn-primary" onclick="openTakeoutModal()">
+                                🛵 Para Llevar / WhatsApp
+                            </button>
+                        </div>
                     </div>
+                    <div class="tables-grid" id="tablesGrid"></div>
                 </div>
 
-                <div class="tables-grid" id="tablesGrid"></div>
-
+                <!-- SECCIÓN 2: TOMA DE PEDIDOS (Pantalla completa sin mesas visibles) -->
                 <div id="orderSection" class="order-section hidden">
-                    <div class="order-header">
-                        <h3 id="currentOrderTitle">Tomando Pedido - Mesa 1</h3>
-                        <button class="btn-close" onclick="closeOrderSection()">✕</button>
-                    </div>
-
-                    <div class="client-loyalty-bar">
-                        <input type="text" id="clientPhone" placeholder="Teléfono o DNI del cliente..." />
-                        <button class="btn btn-secondary" onclick="buscarOAgregarCliente()">🔍 Buscar / Recompensas</button>
-                        <span id="clientLoyaltyStatus" class="loyalty-tag"></span>
+                    <div class="order-nav-header">
+                        <button class="btn-back" onclick="closeOrderSection()">←</button>
+                        <h2 id="currentOrderTitle">Mesa 3</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="alert('Funcionalidad de asignar cliente')">+ Asignar cliente</button>
                     </div>
 
                     <div class="pos-layout">
@@ -112,28 +111,20 @@
                         </div>
 
                         <div class="cart-container">
-                            <h4>Comanda Actual</h4>
+                            <h4 id="cartTableTitle">Mesa 3</h4>
                             <div id="cartItems" class="cart-items">
-                                <p class="empty-msg">No hay ítems seleccionados</p>
+                                <p class="empty-msg">Sin ítems aún.</p>
                             </div>
 
                             <div class="cart-summary">
-                                <div class="summary-row">
-                                    <span>Subtotal:</span>
-                                    <span id="cartSubtotal">S/ 0.00</span>
-                                </div>
-                                <div class="summary-row" id="taperRow" style="display:none;">
-                                    <span>Envases / Tápers:</span>
-                                    <span id="cartTapers">S/ 0.00</span>
-                                </div>
                                 <div class="summary-row total">
                                     <span>Total:</span>
                                     <span id="cartTotal">S/ 0.00</span>
                                 </div>
-
-                                <button class="btn btn-success btn-block" onclick="enviarPedidoACocina()">
-                                    👨‍🍳 Enviar Pedido a Cocina
+                                <button class="btn btn-success btn-block mt-3" onclick="enviarPedidoACocina()">
+                                    🚀 Enviar y cerrar
                                 </button>
+                                <p class="text-muted text-center mt-2" style="font-size: 0.75rem;">Los ítems ya están en cocina y en caja en tiempo real.</p>
                             </div>
                         </div>
                     </div>
@@ -150,7 +141,7 @@
                 </div>
             </section>
 
-            <!-- ==================== VISTA CAJA (DISEÑO SOLICITADO) ==================== -->
+            <!-- ==================== VISTA CAJA ==================== -->
             <section id="view-caja" class="role-view">
                 <div class="caja-top-header">
                     <div>
@@ -173,9 +164,7 @@
                     </div>
                 </div>
 
-                <div class="caja-cards-grid" id="cajaCardsGrid">
-                    <!-- Tarjetas de cuentas activas en tiempo real -->
-                </div>
+                <div class="caja-cards-grid" id="cajaCardsGrid"></div>
             </section>
 
             <!-- ==================== VISTA ADMINISTRADOR ==================== -->
@@ -220,7 +209,7 @@
                     </div>
                 </div>
 
-                <!-- 2. TAB MENÚ (SEPARADO POR CATEGORÍAS + SWITCH DESLIZABLE) -->
+                <!-- 2. TAB MENÚ -->
                 <div id="adminTab-menu" class="admin-tab-pane">
                     <div class="form-card carta-config-card">
                         <div class="carta-config-info">
@@ -256,7 +245,6 @@
                         </form>
                     </div>
 
-                    <!-- Contenedor donde se agruparán los platos por categoría -->
                     <div id="adminMenuCategoriesContainer"></div>
                 </div>
 

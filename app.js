@@ -13,7 +13,7 @@ let dishes = [];
 
 let currentOrder = [];
 let selectedTable = null;
-let dishPendingMod = null; // Plato seleccionado temporalmente para el modal de modificadores
+let dishPendingMod = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCajaView();
 });
 
-// Cargar mesas y platos dinámicamente desde Supabase
 async function cargarDatosDesdeSupabase() {
     try {
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
@@ -60,7 +59,6 @@ async function cargarDatosDesdeSupabase() {
     }
 }
 
-// Autenticación por Nombre de Usuario
 async function handleLogin(event) {
     if (event) event.preventDefault();
     
@@ -164,17 +162,26 @@ function renderTables() {
     });
 }
 
+// ==================== OCULTAR MAPA Y MOSTRAR PEDIDO ====================
 function handleTableClick(table) {
     selectedTable = table;
-    const orderSec = document.getElementById('orderSection');
-    if (orderSec) orderSec.classList.remove('hidden');
-    const title = document.getElementById('currentOrderTitle');
-    if (title) title.innerText = `Tomando Pedido - ${table.name}`;
+    currentOrder = []; // Limpiar comanda previa local al abrir mesa
+
+    // Ocultar mapa de mesas y mostrar la sección de pedidos
+    document.getElementById('salonMapSection').classList.add('hidden');
+    document.getElementById('orderSection').classList.remove('hidden');
+
+    document.getElementById('currentOrderTitle').innerText = table.name;
+    document.getElementById('cartTableTitle').innerText = table.name;
+    updateCartUI();
 }
 
 function closeOrderSection() {
-    const orderSec = document.getElementById('orderSection');
-    if (orderSec) orderSec.classList.add('hidden');
+    // Volver a mostrar el mapa de mesas y ocultar la sección de pedidos
+    document.getElementById('orderSection').classList.add('hidden');
+    document.getElementById('salonMapSection').classList.remove('hidden');
+    selectedTable = null;
+    currentOrder = [];
 }
 
 function filterCategory(cat) { renderDishes(cat); }
@@ -190,13 +197,12 @@ function renderDishes(cat) {
         const div = document.createElement('div');
         div.className = 'dish-card';
         div.innerHTML = `<h5>${dish.name}</h5><p>S/ ${currentPrice.toFixed(2)}</p>`;
-        // Al hacer clic, abre la ventana emergente de modificadores
         div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
     });
 }
 
-// ==================== MODAL DE MODIFICADORES (VENTANA EMERGENTE) ====================
+// ==================== MODAL DE MODIFICADORES ====================
 function openModModal(dish) {
     dishPendingMod = dish;
     document.getElementById('modalDishName').innerText = dish.name;
@@ -270,19 +276,21 @@ function confirmAddToCart() {
 function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
     if (!itemsContainer) return;
-    itemsContainer.innerHTML = '';
-    let subtotal = 0;
-    currentOrder.forEach(item => {
-        subtotal += item.price;
-        itemsContainer.innerHTML += `<div>${item.name} - S/ ${item.price.toFixed(2)}</div>`;
-    });
-    const subTotalEl = document.getElementById('cartSubtotal');
+    
+    if (currentOrder.length === 0) {
+        itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
+    } else {
+        itemsContainer.innerHTML = '';
+        currentOrder.forEach(item => {
+            itemsContainer.innerHTML += `<div style="padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${item.name} - S/ ${item.price.toFixed(2)}</div>`;
+        });
+    }
+
+    let subtotal = currentOrder.reduce((acc, item) => acc + item.price, 0);
     const totalEl = document.getElementById('cartTotal');
-    if (subTotalEl) subTotalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
     if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
-// ==================== CARTA ACTIVA CON SWITCH DESLIZABLE ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
     const lblNormal = document.getElementById('lblCartaNormal');
@@ -299,12 +307,10 @@ function toggleCartaFestiva(isFestiva) {
     renderDishes('Todas');
 }
 
-// ==================== VISTA CAJA (DISEÑO SOLICITADO) ====================
 function renderCajaView() {
     const grid = document.getElementById('cajaCardsGrid');
     if (!grid) return;
 
-    // Datos simulados en tiempo real alineados al diseño de referencia
     const activeTickets = [
         { id: 2, type: 'salon', name: 'Mesa 2', time: '09:26 p. m.', total: 22.00, tapers: 0 },
         { id: 15, type: 'salon', name: 'Mesa 15', time: '07:50 p. m.', total: 212.00, tapers: 13 },
@@ -374,7 +380,6 @@ async function agregarPlato(event) {
     }
 }
 
-// ==================== CARTA ADMINISTRADOR SEPARADA POR CATEGORÍAS ====================
 function renderAdminMenuCategories() {
     const container = document.getElementById('adminMenuCategoriesContainer');
     if (!container) return;
