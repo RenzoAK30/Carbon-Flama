@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbón & Flama - Sistema POS & Gestión</title>
-    <!-- Favicon -->
+    <title>Carbón & Flama - POS & Gestión</title>
     <link rel="icon" type="image/x-icon" href="src/logo.ico">
     <link rel="stylesheet" href="styles.css">
-    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -54,15 +52,22 @@
     <div id="clientModal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3>Asignar Cliente</h3>
-            <p class="text-muted">Ingresa los datos del cliente para fidelización o pedidos.</p>
+            <p class="text-muted">Busca por DNI o ingresa los datos del cliente manualmente.</p>
             <form id="formCliente" onsubmit="guardarClienteMesa(event)">
                 <div class="form-group">
-                    <label>Nombre del Cliente</label>
+                    <label>DNI</label>
+                    <div class="input-with-action">
+                        <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" />
+                        <button type="button" class="btn btn-secondary" onclick="buscarClientePorDni()" title="Buscar en base de datos">🔍</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
                     <input type="text" id="clientNameInput" placeholder="Nombre completo" required />
                 </div>
                 <div class="form-group">
-                    <label>Teléfono / DNI</label>
-                    <input type="text" id="clientPhoneInput" placeholder="Número de contacto" required />
+                    <label>Celular</label>
+                    <input type="text" id="clientPhoneInput" placeholder="Número de celular" required />
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeClientModal()">Cancelar</button>

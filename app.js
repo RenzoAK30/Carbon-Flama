@@ -11,7 +11,7 @@ let isCartaFestiva = false;
 let tables = [];
 let dishes = [];
 let kitchenOrders = [];
-let activeClients = {}; // Clientes asignados por mesa
+let activeClients = {};
 
 let isJoinMode = false;
 let tablesToJoin = [];
@@ -210,14 +210,13 @@ let tempOrderCart = [];
 
 function handleTableClick(tableName) {
     selectedTable = tableName;
-    tempOrderCart = []; // Limpiar carrito local al entrar
+    tempOrderCart = [];
 
     document.getElementById('salonMapSection').classList.add('hidden');
     document.getElementById('orderSection').classList.remove('hidden');
     document.getElementById('currentOrderTitle').innerText = selectedTable;
     document.getElementById('cartTableTitle').innerText = selectedTable;
 
-    // Mostrar cliente asignado si existe
     const clientSpan = document.getElementById('assignedClientTag');
     if (activeClients[selectedTable]) {
         clientSpan.innerText = `${activeClients[selectedTable].name} (${activeClients[selectedTable].phone})`;
@@ -235,8 +234,9 @@ function closeOrderSection() {
     renderTables();
 }
 
-// ==================== ASIGNAR CLIENTE ====================
+// ==================== ASIGNAR CLIENTE & BÚSQUEDA POR DNI ====================
 function openClientModal() {
+    document.getElementById('clientDniInput').value = '';
     document.getElementById('clientNameInput').value = '';
     document.getElementById('clientPhoneInput').value = '';
     document.getElementById('clientModal').classList.remove('hidden');
@@ -246,14 +246,52 @@ function closeClientModal() {
     document.getElementById('clientModal').classList.add('hidden');
 }
 
-function guardarClienteMesa(event) {
+async function buscarClientePorDni() {
+    const dni = document.getElementById('clientDniInput').value.trim();
+    if (!dni) {
+        alert('Por favor ingresa un número de DNI para buscar.');
+        return;
+    }
+
+    try {
+        const { data, error } = await db
+            .from('clientes')
+            .select('*')
+            .eq('dni', dni)
+            .single();
+
+        if (error || !data) {
+            alert('Cliente no encontrado en la base de datos. Por favor completa los datos manualmente.');
+            document.getElementById('clientNameInput').value = '';
+            document.getElementById('clientPhoneInput').value = '';
+            document.getElementById('clientNameInput').focus();
+        } else {
+            document.getElementById('clientNameInput').value = data.nombre || '';
+            document.getElementById('clientPhoneInput').value = data.telefono || '';
+            alert('¡Cliente encontrado y cargado con éxito!');
+        }
+    } catch (err) {
+        console.error("Error al buscar cliente:", err);
+        alert('No se encontró el registro. Puedes llenarlo manualmente.');
+    }
+}
+
+async function guardarClienteMesa(event) {
     event.preventDefault();
+    const dni = document.getElementById('clientDniInput').value.trim();
     const name = document.getElementById('clientNameInput').value.trim();
     const phone = document.getElementById('clientPhoneInput').value.trim();
 
     if (selectedTable && name && phone) {
-        activeClients[selectedTable] = { name, phone };
+        activeClients[selectedTable] = { dni, name, phone };
         document.getElementById('assignedClientTag').innerText = `${name} (${phone})`;
+
+        try {
+            await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
+        } catch (e) {
+            console.error("Error guardando cliente:", e);
+        }
+
         alert('Cliente asignado correctamente.');
         closeClientModal();
     }
@@ -261,7 +299,6 @@ function guardarClienteMesa(event) {
 
 function filterCategory(cat) { renderDishes(cat); }
 
-// RENDERIZAR CARTA CON PRECIOS NORMALES O FESTIVOS SEGÚN SWITCH
 function renderDishes(cat) {
     const grid = document.getElementById('dishesGrid');
     if (!grid) return;
@@ -340,7 +377,6 @@ function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
     if (!itemsContainer) return;
 
-    // Mostrar también los ítems ya enviados a cocina si la mesa ya tiene comanda activa
     const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
     let allItemsToDisplay = existingOrder ? [...existingOrder.items, ...tempOrderCart] : [...tempOrderCart];
 
@@ -368,18 +404,15 @@ async function enviarPedidoACocina() {
         return;
     }
 
-    // Buscar si ya existe una comanda activa en Supabase para esta mesa
     let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
 
     if (existingComanda) {
-        // Añadir nuevos ítems a la comanda existente
         const itemsIns = tempOrderCart.map(i => ({ comanda_id: existingComanda.id, nombre_plato: i.name, precio: i.price }));
         await db.from('items_comanda').insert(itemsIns);
 
         let nuevoTotalTotal = existingComanda.total + tempOrderCart.reduce((acc, i) => acc + i.price, 0);
         await db.from('comandas').update({ total: nuevoTotalTotal }).eq('id', existingComanda.id);
     } else {
-        // Crear nueva comanda
         let totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
         const { data: comRes, error: errC } = await db.from('comandas').insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }]).select();
         if (errC) { alert('Error: ' + errC.message); return; }
@@ -490,7 +523,6 @@ function calcularTotalCajaModal() {
     document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
 }
 
-// IMPRIMIR PRECUENTA
 function imprimirPrecuenta() {
     if (!selectedComandaCaja) return;
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
@@ -583,19 +615,14 @@ async function registrarGasto(event) {
     loadFinanzasData();
 }
 
-// CARGAR VENTAS Y REPORTES REALES EN EL PANEL DE ADMINISTRADOR
 async function loadFinanzasData() {
     try {
-        // 1. Obtener comandas cobradas (Ventas)
         const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*').eq('estado', 'cobrado');
         let totalVentas = 0;
         if (!errC && comandasCobradas) {
-            // Si la columna total está en 0 por cierres pasados, sumamos los ítems cobrados o respaldamos con histórico
-            //totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), desglosarTotalVentas(c.id)), 0);
-			totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), 0);
+            totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), 0);
         }
 
-        // 2. Obtener gastos operativos
         const { data: gastos, error: errG } = await db.from('gastos').select('*');
         let totalGastos = 0;
         if (!errG && gastos) {
@@ -617,10 +644,6 @@ async function loadFinanzasData() {
     } catch (err) {
         console.error("Error cargando finanzas:", err);
     }
-}
-
-function desglosarTotalVentas(comandaId) {
-    return 0; // Función auxiliar de respaldo
 }
 
 async function agregarPlato(event) {
