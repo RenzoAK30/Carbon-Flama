@@ -39,13 +39,14 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .kds-ticket p { font-size: 0.85rem; color: #a0a0a0; margin-bottom: 0.8rem; }
 
 /* Navegación Pedidos */
-.order-nav-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.order-nav-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
 .btn-back { background: var(--card-bg); border: 1px solid var(--border-color); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .btn-back:hover { background: var(--border-color); }
 
-/* Modal Modificadores */
+/* Modales */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal-card { background: var(--card-bg); padding: 2rem; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.modal-large { max-width: 550px; }
 .modifiers-options { display: flex; flex-direction: column; gap: 0.8rem; margin: 1rem 0; }
 .modifier-option { display: flex; align-items: center; gap: 0.8rem; background: #1e1e24; padding: 0.8rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); }
 .modifier-option input { accent-color: var(--primary-color); width: 18px; height: 18px; }
@@ -55,7 +56,7 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .text-muted { color: #a0a0a0; font-size: 0.85rem; }
 .text-center { text-align: center; }
 
-/* Vista Caja */
+/* Vista Caja y Detalle de Cuentas Separadas */
 .caja-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
 .caja-kpi-group { display: flex; gap: 1rem; }
 .caja-kpi-pill { background: var(--card-bg); border: 1px solid var(--border-color); padding: 0.6rem 1.2rem; border-radius: 10px; display: flex; flex-direction: column; align-items: center; min-width: 110px; }
@@ -63,10 +64,13 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .kpi-label { font-size: 0.8rem; color: #a0a0a0; }
 .kpi-value { font-size: 1.1rem; font-weight: 700; color: #fff; }
 .caja-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
-.caja-ticket-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.caja-ticket-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.2s; }
+.caja-ticket-card:hover { transform: translateY(-3px); border-color: var(--primary-color); }
 .ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 600; font-size: 1.1rem; }
 .ticket-time { font-size: 0.85rem; color: #a0a0a0; margin-bottom: 1rem; }
 .ticket-price { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); }
+.caja-detalle-items { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+.caja-item-row { display: flex; justify-content: space-between; align-items: center; background: #1e1e24; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); }
 
 /* Switch Deslizable Carta Activa */
 .carta-config-card { display: flex; justify-content: space-between; align-items: center; }

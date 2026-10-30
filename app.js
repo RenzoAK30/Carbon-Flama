@@ -10,13 +10,13 @@ let isCartaFestiva = false;
 
 let tables = [];
 let dishes = [];
-let activeOrders = {}; // Comandas locales en curso por mesa
-let kitchenOrders = []; // Comandas sincronizadas para cocina
+let kitchenOrders = [];
 let isJoinMode = false;
 let tablesToJoin = [];
 
 let selectedTable = null;
 let dishPendingMod = null;
+let selectedComandaCaja = null; // Comanda activa abierta en el modal de caja
 
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
@@ -51,7 +51,6 @@ async function cargarDatosDesdeSupabase() {
             }));
         }
 
-        // Cargar comandas activas desde Supabase para persistencia entre sesiones
         await sincronizarComandasDesdeDB();
 
         renderTables();
@@ -70,11 +69,13 @@ async function sincronizarComandasDesdeDB() {
             id: c.id,
             table: c.mesa,
             status: c.estado,
+            total: parseFloat(c.total),
             time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            items: c.items_comanda.map(i => ({ name: i.nombre_plato, price: parseFloat(i.precio) }))
+            items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
 
-        // Actualizar estado ocupado en mesas del salón
+        // Resetear estado de mesas
+        tables.forEach(t => t.status = 'free');
         coms.forEach(c => {
             if (c.estado !== 'cobrado') {
                 const t = tables.find(tb => tb.name === c.mesa);
@@ -84,6 +85,7 @@ async function sincronizarComandasDesdeDB() {
     }
     renderCajaView();
     renderKitchenView();
+    renderTables();
 }
 
 async function handleLogin(event) {
@@ -98,53 +100,25 @@ async function handleLogin(event) {
     }
 
     try {
-        const { data, error } = await db
-            .from('usuarios')
-            .select('*')
-            .ilike('usuario', usuarioInput);
-
-        if (error) {
-            alert('Error al consultar la base de datos: ' + error.message);
-            return;
-        }
-
-        if (!data || data.length === 0) {
-            alert('El usuario "' + usuarioInput + '" no existe en la base de datos.');
-            return;
-        }
+        const { data, error } = await db.from('usuarios').select('*').ilike('usuario', usuarioInput);
+        if (error) { alert('Error: ' + error.message); return; }
+        if (!data || data.length === 0) { alert('El usuario no existe.'); return; }
 
         const perfil = data[0];
-
-        if (String(perfil.password).trim() !== String(passwordInput).trim()) {
-            alert('Contraseña incorrecta.');
-            return;
-        }
-
-        if (!perfil.activo) {
-            alert('Tu cuenta se encuentra desactivada.');
-            return;
-        }
+        if (String(perfil.password).trim() !== String(passwordInput).trim()) { alert('Contraseña incorrecta.'); return; }
+        if (!perfil.activo) { alert('Tu cuenta está desactivada.'); return; }
 
         localStorage.setItem('cf_user', JSON.stringify(perfil));
         activarSesion(perfil);
-
     } catch (err) {
-        alert('Ocurrió un error inesperado: ' + err.message);
+        alert('Error inesperado: ' + err.message);
     }
 }
 
 function activarSesion(perfil) {
-    const loginView = document.getElementById('loginView');
-    const appView = document.getElementById('appView');
-    
-    if (loginView) loginView.classList.add('hidden');
-    if (appView) appView.classList.remove('hidden');
-    
-    const userNameEl = document.getElementById('loggedUserName');
-    if (userNameEl) {
-        userNameEl.innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
-    }
-
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('appView').classList.remove('hidden');
+    document.getElementById('loggedUserName').innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
     switchRoleView(perfil.rol);
 }
 
@@ -156,16 +130,13 @@ function handleLogout() {
 function switchRoleView(role) {
     currentRole = role;
     document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
-    
-    let vistaId = `view-${role}`;
-    const target = document.getElementById(vistaId);
+    let target = document.getElementById(`view-${role}`);
     if (target) {
         target.classList.add('active');
         if (role === 'caja') renderCajaView();
         if (role === 'cocina') renderKitchenView();
     } else {
-        const defaultView = document.getElementById('view-mesero');
-        if(defaultView) defaultView.classList.add('active');
+        document.getElementById('view-mesero').classList.add('active');
     }
 }
 
@@ -173,11 +144,10 @@ function switchAdminTab(tabName, event) {
     document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
     if (event) event.currentTarget.classList.add('active');
-    const pane = document.getElementById(`adminTab-${tabName}`);
-    if (pane) pane.classList.add('active');
+    document.getElementById(`adminTab-${tabName}`).classList.add('active');
 }
 
-// ==================== MAPA DE MESAS Y MODO UNIR ====================
+// ==================== MAPA DE MESAS ====================
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
     if (!grid) return;
@@ -216,42 +186,29 @@ function toggleJoinTablesMode() {
 }
 
 function toggleSelectTableToJoin(id) {
-    if (tablesToJoin.includes(id)) {
-        tablesToJoin = tablesToJoin.filter(t => t.id !== id);
-    } else {
-        tablesToJoin.push(id);
-    }
+    if (tablesToJoin.includes(id)) tablesToJoin = tablesToJoin.filter(t => t.id !== id);
+    else tablesToJoin.push(id);
+
     if (tablesToJoin.length >= 2) {
         const names = tables.filter(t => tablesToJoin.includes(t.id)).map(t => t.name).join(' + ');
-        alert(`Mesas unidas correctamente: ${names}`);
+        alert(`Mesas unidas: ${names}`);
         isJoinMode = false;
         tablesToJoin = [];
-        const btn = document.getElementById('btnJoinMode');
-        btn.style.background = '';
-        btn.style.color = '';
+        document.getElementById('btnJoinMode').style.background = '';
     }
     renderTables();
 }
 
 function openTakeoutView() {
-    const deliveryName = "Delivery / Para Llevar #" + (Math.floor(Math.random() * 900) + 100);
+    const deliveryName = "Delivery / Llevar #" + (Math.floor(Math.random() * 900) + 100);
     handleTableClick(deliveryName);
 }
 
-// ==================== TOMA DE PEDIDOS Y PERSISTENCIA ====================
+// ==================== TOMA DE PEDIDOS ====================
 function handleTableClick(tableName) {
     selectedTable = tableName;
-
-    // Inicializar comanda local si no existe
-    if (!activeOrders[selectedTable]) {
-        // Verificar si ya hay platos enviados en cocina para esta mesa
-        const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'delivered');
-        activeOrders[selectedTable] = existingOrder ? [...existingOrder.items] : [];
-    }
-
     document.getElementById('salonMapSection').classList.add('hidden');
     document.getElementById('orderSection').classList.remove('hidden');
-
     document.getElementById('currentOrderTitle').innerText = selectedTable;
     document.getElementById('cartTableTitle').innerText = selectedTable;
     updateCartUI();
@@ -282,7 +239,7 @@ function renderDishes(cat) {
     });
 }
 
-// ==================== MODAL DE MODIFICADORES ====================
+// ==================== MODIFICADORES ====================
 function openModModal(dish) {
     dishPendingMod = dish;
     document.getElementById('modalDishName').innerText = dish.name;
@@ -290,8 +247,6 @@ function openModModal(dish) {
     document.getElementById('modalComment').value = '';
 
     const container = document.getElementById('modifiersContainer');
-    container.innerHTML = '';
-
     let optionsHtml = '';
     if (dish.category === 'Parrillas') {
         optionsHtml = `
@@ -305,9 +260,8 @@ function openModModal(dish) {
             <label class="modifier-option"><input type="radio" name="modOption" value="Arroz Chaufa"> Arroz Chaufa (+ S/ 3.00)</label>
         `;
     } else {
-        optionsHtml = `<p class="text-muted">Este producto no requiere modificadores de acompañamiento.</p>`;
+        optionsHtml = `<p class="text-muted">Sin modificadores adicionales.</p>`;
     }
-
     container.innerHTML = optionsHtml;
     document.getElementById('modModal').classList.remove('hidden');
 }
@@ -317,9 +271,9 @@ function closeModModal() {
     dishPendingMod = null;
 }
 
+let tempOrderCart = []; // Carrito local mientras se arma el pedido
 function confirmAddToCart() {
-    if (!dishPendingMod || !selectedTable) return;
-
+    if (!dishPendingMod) return;
     let extraPrice = 0;
     let selectedOptionName = 'Original';
 
@@ -327,125 +281,72 @@ function confirmAddToCart() {
     if (selectedRadio) {
         selectedOptionName = selectedRadio.value;
         if (selectedOptionName === 'Arroz blanco') extraPrice = 3.00;
-        if (selectedOptionName === 'Arroz Chaufa') {
-            extraPrice = dishPendingMod.category === 'Parrillas' ? 5.00 : 3.00;
-        }
+        if (selectedOptionName === 'Arroz Chaufa') extraPrice = dishPendingMod.category === 'Parrillas' ? 5.00 : 3.00;
     }
 
     const comment = document.getElementById('modalComment').value.trim();
-    
     let finalItemName = dishPendingMod.name;
-    if (selectedOptionName !== 'Original') {
-        finalItemName += ` (${selectedOptionName})`;
-    }
-    if (comment) {
-        finalItemName += ` [Nota: ${comment}]`;
-    }
+    if (selectedOptionName !== 'Original') finalItemName += ` (${selectedOptionName})`;
+    if (comment) finalItemName += ` [Nota: ${comment}]`;
 
-    const finalPrice = dishPendingMod.price + extraPrice;
-
-    if (!activeOrders[selectedTable]) activeOrders[selectedTable] = [];
-    activeOrders[selectedTable].push({
-        name: finalItemName,
-        price: finalPrice
-    });
-
-    // Cambiar estado de mesa a ocupada en memoria visual
-    const tableObj = tables.find(t => t.name === selectedTable);
-    if (tableObj) {
-        tableObj.status = 'occupied';
-    }
-
+    tempOrderCart.push({ name: finalItemName, price: dishPendingMod.price + extraPrice });
     updateCartUI();
     closeModModal();
 }
 
 function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
-    if (!itemsContainer || !selectedTable) return;
-    
-    const currentOrder = activeOrders[selectedTable] || [];
+    if (!itemsContainer) return;
 
-    if (currentOrder.length === 0) {
+    if (tempOrderCart.length === 0) {
         itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
     } else {
         itemsContainer.innerHTML = '';
-        currentOrder.forEach((item, index) => {
+        tempOrderCart.forEach((item, index) => {
             itemsContainer.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <span>${item.name} - S/ ${item.price.toFixed(2)}</span>
-                    <button class="btn btn-secondary btn-sm" onclick="removeItemFromOrder(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>
+                    <button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>
                 </div>
             `;
         });
     }
-
-    let subtotal = currentOrder.reduce((acc, item) => acc + item.price, 0);
-    const totalEl = document.getElementById('cartTotal');
-    if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
+    let subtotal = tempOrderCart.reduce((acc, item) => acc + item.price, 0);
+    document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
-function removeItemFromOrder(index) {
-    if (!selectedTable) return;
-    activeOrders[selectedTable].splice(index, 1);
-    updateCartUI();
-}
-
-// ==================== ENVIAR A COCINA Y SUPABASE ====================
 async function enviarPedidoACocina() {
-    if (!selectedTable || !activeOrders[selectedTable] || activeOrders[selectedTable].length === 0) {
-        alert('No hay platos en la comanda para enviar.');
+    if (!selectedTable || tempOrderCart.length === 0) {
+        alert('No hay platos para enviar.');
         return;
     }
 
-    const items = activeOrders[selectedTable];
-    const totalMonto = items.reduce((acc, i) => acc + i.price, 0);
+    const totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
 
-    // 1. Guardar comanda principal en Supabase
-    const { data: comandaRes, error: errComanda } = await db
-        .from('comandas')
-        .insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }])
-        .select();
+    const { data: comRes, error: errC } = await db.from('comandas').insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }]).select();
+    if (errC) { alert('Error: ' + errC.message); return; }
 
-    if (errComanda) {
-        alert('Error al enviar pedido a cocina: ' + errComanda.message);
-        return;
-    }
-
-    const comandaId = comandaRes[0].id;
-
-    // 2. Guardar cada ítem del plato en Supabase
-    const itemsToInsert = items.map(i => ({
-        comanda_id: comandaId,
-        nombre_plato: i.name,
-        precio: i.price
-    }));
-
-    const { error: errItems } = await db.from('items_comanda').insert(itemsToInsert);
-    if (errItems) {
-        alert('Error al registrar ítems: ' + errItems.message);
-        return;
-    }
-
-    alert(`¡Pedido de ${selectedTable} enviado a cocina correctamente!`);
+    const comandaId = comRes[0].id;
+    const itemsIns = tempOrderCart.map(i => ({ comanda_id: comandaId, nombre_plato: i.name, precio: i.price }));
     
+    await db.from('items_comanda').insert(itemsIns);
+
+    alert(`¡Pedido de ${selectedTable} enviado a cocina!`);
+    tempOrderCart = [];
     closeOrderSection();
     await sincronizarComandasDesdeDB();
 }
 
-// ==================== KDS COCINA (COLUMNAS VERTICALES) ====================
+// ==================== KDS COCINA ====================
 function renderKitchenView() {
     const pendingList = document.getElementById('kdsPending');
     const preparingList = document.getElementById('kdsPreparing');
     const deliveredList = document.getElementById('kdsDelivered');
+    if (!pendingList) return;
 
-    if (!pendingList || !preparingList || !deliveredList) return;
+    pendingList.innerHTML = ''; preparingList.innerHTML = ''; deliveredList.innerHTML = '';
 
-    pendingList.innerHTML = '';
-    preparingList.innerHTML = '';
-    deliveredList.innerHTML = '';
-
-    kitchenOrders.forEach(ord => {
+    kitchenOrders.filter(o => o.status !== 'cobrado').forEach(ord => {
         let itemsHtml = ord.items.map(i => `<li>${i.name}</li>`).join('');
         const cardHtml = `
             <div class="kds-ticket">
@@ -458,7 +359,6 @@ function renderKitchenView() {
                 </div>
             </div>
         `;
-
         if (ord.status === 'pendiente') pendingList.innerHTML += cardHtml;
         if (ord.status === 'preparando') preparingList.innerHTML += cardHtml;
         if (ord.status === 'entregado') deliveredList.innerHTML += cardHtml;
@@ -466,25 +366,19 @@ function renderKitchenView() {
 }
 
 async function updateOrderStatus(id, newStatus) {
-    const { error } = await db.from('comandas').update({ estado: newStatus }).eq('id', id);
-    if (!error) {
-        await sincronizarComandasDesdeDB();
-    }
+    await db.from('comandas').update({ estado: newStatus }).eq('id', id);
+    await sincronizarComandasDesdeDB();
 }
 
-// ==================== VISTA CAJA ====================
+// ==================== VISTA CAJA & CUENTAS SEPARADAS ====================
 function renderCajaView() {
     const grid = document.getElementById('cajaCardsGrid');
     if (!grid) return;
 
     const activeTickets = kitchenOrders.filter(o => o.status !== 'cobrado');
-
     let salonCount = activeTickets.filter(t => !t.table.includes('Delivery')).length;
     let llevarCount = activeTickets.filter(t => t.table.includes('Delivery')).length;
-    let totalCobrar = activeTickets.reduce((acc, t) => {
-        let tSum = t.items.reduce((sum, i) => sum + i.price, 0);
-        return acc + tSum;
-    }, 0);
+    let totalCobrar = activeTickets.reduce((acc, t) => acc + t.total, 0);
 
     document.getElementById('cajaTotalCuentas').innerText = activeTickets.length;
     document.getElementById('cajaSalonLlevar').innerText = `${salonCount} / ${llevarCount}`;
@@ -492,33 +386,99 @@ function renderCajaView() {
 
     grid.innerHTML = '';
     activeTickets.forEach(ticket => {
-        let ticketTotal = ticket.items.reduce((sum, i) => sum + i.price, 0);
         grid.innerHTML += `
-            <div class="caja-ticket-card">
-                <div class="ticket-header">
-                    <span>🍽️ ${ticket.table}</span>
-                </div>
-                <div class="ticket-time">Abierta ${ticket.time}</div>
-                <div class="ticket-price">S/ ${ticketTotal.toFixed(2)}</div>
+            <div class="caja-ticket-card" onclick="openCajaModal(${ticket.id})">
+                <div class="ticket-header"><span>🍽️ ${ticket.table}</span></div>
+                <div class="ticket-time">Abierta ${ticket.time} | Ítems: ${ticket.items.length}</div>
+                <div class="ticket-price">S/ ${ticket.total.toFixed(2)}</div>
             </div>
         `;
     });
 }
 
+function openCajaModal(comandaId) {
+    selectedComandaCaja = kitchenOrders.find(o => o.id === comandaId);
+    if (!selectedComandaCaja) return;
+
+    document.getElementById('cajaModalTitle').innerText = `Detalle de Consumo - ${selectedComandaCaja.table}`;
+    const listContainer = document.getElementById('cajaItemsList');
+    listContainer.innerHTML = '';
+
+    selectedComandaCaja.items.forEach((item, idx) => {
+        listContainer.innerHTML += `
+            <div class="caja-item-row">
+                <label style="display:flex; align-items:center; gap:0.8rem; cursor:pointer;">
+                    <input type="checkbox" class="caja-item-chk" value="${item.id}" data-price="${item.price}" checked onchange="calcularTotalCajaModal()">
+                    <span>${item.name}</span>
+                </label>
+                <strong>S/ ${item.price.toFixed(2)}</strong>
+            </div>
+        `;
+    });
+
+    calcularTotalCajaModal();
+    document.getElementById('cajaModal').classList.remove('hidden');
+}
+
+function closeCajaModal() {
+    document.getElementById('cajaModal').classList.add('hidden');
+    selectedComandaCaja = null;
+}
+
+function calcularTotalCajaModal() {
+    const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
+    let sub = 0;
+    checkboxes.forEach(chk => sub += parseFloat(chk.dataset.price));
+    document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
+}
+
+// Cobrar solo lo seleccionado (Cuentas Separadas / Parciales)
+async function cobrarSeleccionados() {
+    const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
+    if (checkboxes.length === 0) { alert('Selecciona al menos un ítem para cobrar.'); return; }
+
+    const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
+    
+    // Eliminar ítems pagados de la base de datos
+    for (let id of itemIdsToPay) {
+        await db.from('items_comanda').delete().eq('id', id);
+    }
+
+    // Recalcular total restante de la comanda
+    const remainingItems = selectedComandaCaja.items.filter(i => !itemIdsToPay.includes(i.id));
+    
+    if (remainingItems.length === 0) {
+        // Si pagó todo, cerramos la comanda por completo
+        await db.from('comandas').update({ estado: 'cobrado', total: 0 }).eq('id', selectedComandaCaja.id);
+        alert('¡Cuenta cobrada y mesa liberada con éxito!');
+    } else {
+        // Si quedan ítems (cuenta separada parcial), actualizamos el total en Supabase
+        let newTotal = remainingItems.reduce((acc, i) => acc + i.price, 0);
+        await db.from('comandas').update({ total: newTotal }).eq('id', selectedComandaCaja.id);
+        alert('¡Pago parcial procesado con éxito! Cuenta separada registrada.');
+    }
+
+    closeCajaModal();
+    await sincronizarComandasDesdeDB();
+}
+
+// Cobrar todo el ticket de golpe
+async function cobrarTodoYDesocupar() {
+    if (!selectedComandaCaja) return;
+
+    await db.from('comandas').update({ estado: 'cobrado', total: 0 }).eq('id', selectedComandaCaja.id);
+    await db.from('items_comanda').delete().eq('comanda_id', selectedComandaCaja.id);
+
+    alert(`¡Mesa ${selectedComandaCaja.table} cobrada y liberada por completo!`);
+    closeCajaModal();
+    await sincronizarComandasDesdeDB();
+}
+
 // ==================== CARTA Y CONFIGURACIÓN ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
-    const lblNormal = document.getElementById('lblCartaNormal');
-    const lblFestiva = document.getElementById('lblCartaFestiva');
-
-    if (isFestiva) {
-        lblNormal.classList.remove('active');
-        lblFestiva.classList.add('active');
-    } else {
-        lblFestiva.classList.remove('active');
-        lblNormal.classList.add('active');
-    }
-
+    document.getElementById('lblCartaNormal').classList.toggle('active', !isFestiva);
+    document.getElementById('lblCartaFestiva').classList.toggle('active', isFestiva);
     renderDishes('Todas');
 }
 
@@ -537,8 +497,7 @@ async function loadFinanzasData() {
     const { data: gastos } = await db.from('gastos').select('*');
     if (gastos) {
         let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
-        const kpi = document.getElementById('kpiGastosTotal');
-        if (kpi) kpi.innerText = `S/ ${totalGastos.toFixed(2)}`;
+        document.getElementById('kpiGastosTotal').innerText = `S/ ${totalGastos.toFixed(2)}`;
     }
 }
 
@@ -551,10 +510,8 @@ async function agregarPlato(event) {
     const categoria = document.getElementById('platoCategoria').value;
 
     const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo }]);
-    if (error) {
-        alert('Error al agregar plato: ' + error.message);
-    } else {
-        alert('Plato agregado correctamente');
+    if (error) { alert('Error: ' + error.message); } else {
+        alert('Plato agregado');
         document.getElementById('formPlato').reset();
         cargarDatosDesdeSupabase();
     }
@@ -565,34 +522,20 @@ function renderAdminMenuCategories() {
     if (!container) return;
     container.innerHTML = '';
 
-    const categoriasUnicas = ['Parrillas', 'Cenas', 'Selvaticos', 'Guarniciones', 'Bebidas'];
-
-    categoriasUnicas.forEach(cat => {
+    ['Parrillas', 'Cenas', 'Selvaticos', 'Guarniciones', 'Bebidas'].forEach(cat => {
         const platosCat = dishes.filter(d => d.category === cat);
-        
-        let itemsHtml = '';
-        if (platosCat.length === 0) {
-            itemsHtml = `<p class="text-muted" style="padding: 0.5rem 0;">No hay productos en esta categoría.</p>`;
-        } else {
-            platosCat.forEach(d => {
-                itemsHtml += `
-                    <div class="menu-item-row">
-                        <span>${d.name}</span>
-                        <div style="text-align: right;">
-                            <span class="menu-item-prices">S/ ${d.price.toFixed(2)}</span>
-                            <div class="menu-item-fest">Fest. S/ ${d.festivo.toFixed(2)}</div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
+        let itemsHtml = platosCat.length === 0 ? `<p class="text-muted">No hay productos.</p>` : '';
+        platosCat.forEach(d => {
+            itemsHtml += `
+                <div class="menu-item-row">
+                    <span>${d.name}</span>
+                    <div style="text-align: right;"><span class="menu-item-prices">S/ ${d.price.toFixed(2)}</span><div class="menu-item-fest">Fest. S/ ${d.festivo.toFixed(2)}</div></div>
+                </div>
+            `;
+        });
         container.innerHTML += `
             <div class="admin-category-section">
-                <div class="admin-category-title">
-                    <span>${cat}</span>
-                    <span class="text-muted" style="font-size:0.85rem;">${platosCat.length} ítems</span>
-                </div>
+                <div class="admin-category-title"><span>${cat}</span><span class="text-muted">${platosCat.length} ítems</span></div>
                 ${itemsHtml}
             </div>
         `;
@@ -612,24 +555,15 @@ function renderAdminMesas() {
 async function agregarMesaSalon() {
     const num = document.getElementById('nuevaMesaNum').value;
     if (num) {
-        const nombre = `Mesa ${num}`;
-        const { error } = await db.from('mesas').insert([{ nombre, status: 'free' }]);
-        if (error) {
-            alert('Error al agregar mesa: ' + error.message);
-        } else {
-            document.getElementById('nuevaMesaNum').value = '';
-            cargarDatosDesdeSupabase();
-        }
+        await db.from('mesas').insert([{ nombre: `Mesa ${num}`, status: 'free' }]);
+        document.getElementById('nuevaMesaNum').value = '';
+        cargarDatosDesdeSupabase();
     }
 }
 
 async function eliminarMesa(id) {
-    const { error } = await db.from('mesas').delete().eq('id', id);
-    if (error) {
-        alert('Error al eliminar mesa: ' + error.message);
-    } else {
-        cargarDatosDesdeSupabase();
-    }
+    await db.from('mesas').delete().eq('id', id);
+    cargarDatosDesdeSupabase();
 }
 
 async function crearUsuarioTrabajador(e) {
@@ -640,9 +574,7 @@ async function crearUsuarioTrabajador(e) {
     const rol = document.getElementById('usrRol').value;
 
     const { error } = await db.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
-    if (error) {
-        alert('Error al crear usuario: ' + error.message);
-    } else {
+    if (error) { alert('Error: ' + error.message); } else {
         alert('Trabajador creado con éxito.');
         e.target.reset();
     }

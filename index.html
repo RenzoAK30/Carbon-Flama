@@ -33,22 +33,45 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL DE MODIFICADORES / EXTRAS ==================== -->
+    <!-- ==================== MODAL DE MODIFICADORES (MESERO) ==================== -->
     <div id="modModal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3 id="modalDishName">Personalizar Plato</h3>
             <p id="modalDishCategory" class="text-muted"></p>
-            
             <div id="modifiersContainer" class="modifiers-options"></div>
-
             <div class="form-group mt-3">
                 <label>Comentario / Presa específica:</label>
-                <input type="text" id="modalComment" placeholder="Ej: Pecho, bien jugoso, sin ensalada..." />
+                <input type="text" id="modalComment" placeholder="Ej: Pecho, bien jugoso..." />
             </div>
-
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmAddToCart()">Añadir a Comanda</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL DE DETALLE Y COBRO (CAJA & CUENTAS SEPARADAS) ==================== -->
+    <div id="cajaModal" class="modal-overlay hidden">
+        <div class="modal-card modal-large">
+            <div class="order-nav-header" style="margin-bottom:1rem;">
+                <h3 id="cajaModalTitle">Detalle de Consumo - Mesa</h3>
+                <button class="btn-secondary btn-sm" onclick="closeCajaModal()">✕ Cerrar</button>
+            </div>
+            <p class="text-muted">Selecciona los ítems a cobrar (para cuentas separadas) o procesa el pago total.</p>
+            
+            <div id="cajaItemsList" class="caja-detalle-items">
+                <!-- Se cargan los platos dinámicamente -->
+            </div>
+
+            <div class="cart-summary mt-3">
+                <div class="summary-row total">
+                    <span>Monto Seleccionado / Total:</span>
+                    <span id="cajaModalTotal">S/ 0.00</span>
+                </div>
+                <div class="modal-actions mt-3">
+                    <button class="btn btn-secondary" onclick="cobrarSeleccionados()">💳 Cobrar Selección Parcial</button>
+                    <button class="btn btn-success" onclick="cobrarTodoYDesocupar()">✅ Cobrar Todo y Cerrar Mesa</button>
+                </div>
             </div>
         </div>
     </div>
@@ -70,29 +93,22 @@
 
             <!-- ==================== VISTA MESERO ==================== -->
             <section id="view-mesero" class="role-view">
-                
-                <!-- MAPA DE MESAS Y DELIVERYS -->
                 <div id="salonMapSection">
                     <div class="salon-header">
                         <h2>Mapa de Mesas</h2>
                         <div class="table-actions">
-                            <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">
-                                🔗 Modo Unir Mesas
-                            </button>
-                            <button class="btn btn-primary" onclick="openTakeoutView()">
-                                🛵 Para Llevar / Deliverys
-                            </button>
+                            <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">🔗 Modo Unir Mesas</button>
+                            <button class="btn btn-primary" onclick="openTakeoutView()">🛵 Para Llevar / Deliverys</button>
                         </div>
                     </div>
                     <div class="tables-grid" id="tablesGrid"></div>
                 </div>
 
-                <!-- TOMA DE PEDIDOS (MESAS / DELIVERY) -->
                 <div id="orderSection" class="order-section hidden">
                     <div class="order-nav-header">
                         <button class="btn-back" onclick="closeOrderSection()">← Volver</button>
                         <h2 id="currentOrderTitle">Mesa 1</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="alert('Cliente asignado correctamente')">+ Asignar cliente</button>
+                        <button class="btn btn-secondary btn-sm" onclick="alert('Cliente asignado')">+ Asignar cliente</button>
                     </div>
 
                     <div class="pos-layout">
@@ -113,38 +129,25 @@
                             <div id="cartItems" class="cart-items">
                                 <p class="empty-msg">Sin ítems aún.</p>
                             </div>
-
                             <div class="cart-summary">
                                 <div class="summary-row total">
                                     <span>Total:</span>
                                     <span id="cartTotal">S/ 0.00</span>
                                 </div>
-                                <button class="btn btn-success btn-block mt-3" onclick="enviarPedidoACocina()">
-                                    🚀 Enviar y cerrar
-                                </button>
-                                <p class="text-muted text-center mt-2" style="font-size: 0.75rem;">Los ítems van a cocina y caja en tiempo real.</p>
+                                <button class="btn btn-success btn-block mt-3" onclick="enviarPedidoACocina()">🚀 Enviar y cerrar</button>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- ==================== VISTA COCINA (KDS COLUMNAS VERTICALES) ==================== -->
+            <!-- ==================== VISTA COCINA ==================== -->
             <section id="view-cocina" class="role-view">
                 <h2>Pantalla de Cocina (KDS)</h2>
                 <div class="kds-board">
-                    <div class="kds-column">
-                        <div class="kds-column-header bg-pending">Pendiente</div>
-                        <div id="kdsPending" class="kds-list"></div>
-                    </div>
-                    <div class="kds-column">
-                        <div class="kds-column-header bg-preparing">En Preparación</div>
-                        <div id="kdsPreparing" class="kds-list"></div>
-                    </div>
-                    <div class="kds-column">
-                        <div class="kds-column-header bg-delivered">Entregado</div>
-                        <div id="kdsDelivered" class="kds-list"></div>
-                    </div>
+                    <div class="kds-column"><div class="kds-column-header bg-pending">Pendiente</div><div id="kdsPending" class="kds-list"></div></div>
+                    <div class="kds-column"><div class="kds-column-header bg-preparing">En Preparación</div><div id="kdsPreparing" class="kds-list"></div></div>
+                    <div class="kds-column"><div class="kds-column-header bg-delivered">Entregado</div><div id="kdsDelivered" class="kds-list"></div></div>
                 </div>
             </section>
 
@@ -156,21 +159,11 @@
                         <p class="text-muted">Cuentas activas en tiempo real</p>
                     </div>
                     <div class="caja-kpi-group">
-                        <div class="caja-kpi-pill">
-                            <span class="kpi-label">Cuentas</span>
-                            <span class="kpi-value" id="cajaTotalCuentas">0</span>
-                        </div>
-                        <div class="caja-kpi-pill">
-                            <span class="kpi-label">Salón / Llevar</span>
-                            <span class="kpi-value" id="cajaSalonLlevar">0 / 0</span>
-                        </div>
-                        <div class="caja-kpi-pill highlight">
-                            <span class="kpi-label">Por cobrar</span>
-                            <span class="kpi-value" id="cajaPorCobrar">S/ 0.00</span>
-                        </div>
+                        <div class="caja-kpi-pill"><span class="kpi-label">Cuentas</span><span class="kpi-value" id="cajaTotalCuentas">0</span></div>
+                        <div class="caja-kpi-pill"><span class="kpi-label">Salón / Llevar</span><span class="kpi-value" id="cajaSalonLlevar">0 / 0</span></div>
+                        <div class="caja-kpi-pill highlight"><span class="kpi-label">Por cobrar</span><span class="kpi-value" id="cajaPorCobrar">S/ 0.00</span></div>
                     </div>
                 </div>
-
                 <div class="caja-cards-grid" id="cajaCardsGrid"></div>
             </section>
 
@@ -180,7 +173,6 @@
                     <h2>Administración</h2>
                     <p>Reportes de ventas, gestión de menú, mesas y usuarios.</p>
                 </div>
-
                 <div class="admin-tabs-bar">
                     <button class="admin-tab-btn active" onclick="switchAdminTab('reportes', event)">Reportes</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('menu', event)">Menú</button>
@@ -191,7 +183,6 @@
                     <button class="admin-tab-btn" onclick="switchAdminTab('ajustes', event)">Ajustes</button>
                 </div>
 
-                <!-- 1. TAB REPORTES -->
                 <div id="adminTab-reportes" class="admin-tab-pane active">
                     <div class="dashboard-kpi-grid">
                         <div class="kpi-card"><h4>Ventas Totales</h4><p id="kpiVentasTotal">S/ 0.00</p></div>
@@ -202,12 +193,7 @@
                         <h3>Registrar Gasto del Local</h3>
                         <form id="formGasto" onsubmit="registrarGasto(event)">
                             <div class="form-row">
-                                <select id="gastoCategoria" required>
-                                    <option value="Servicios">Servicios</option>
-                                    <option value="Personal">Personal</option>
-                                    <option value="Alquiler">Alquiler</option>
-                                    <option value="Otros">Otros</option>
-                                </select>
+                                <select id="gastoCategoria" required><option value="Servicios">Servicios</option><option value="Personal">Personal</option><option value="Alquiler">Alquiler</option><option value="Otros">Otros</option></select>
                                 <input type="text" id="gastoDesc" placeholder="Descripción..." required />
                                 <input type="number" step="0.10" id="gastoMonto" placeholder="Monto S/" required />
                                 <button type="submit" class="btn btn-primary">+ Gasto</button>
@@ -216,23 +202,15 @@
                     </div>
                 </div>
 
-                <!-- 2. TAB MENÚ -->
                 <div id="adminTab-menu" class="admin-tab-pane">
                     <div class="form-card carta-config-card">
-                        <div class="carta-config-info">
-                            <h3>Carta activa</h3>
-                            <p class="text-muted">Cambia entre precios normales y festivos instantáneamente</p>
-                        </div>
+                        <div class="carta-config-info"><h3>Carta activa</h3><p class="text-muted">Cambia entre precios normales y festivos</p></div>
                         <div class="carta-toggle-container">
                             <span id="lblCartaNormal" class="toggle-label active">NORMAL</span>
-                            <label class="switch">
-                                <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)">
-                                <span class="slider round"></span>
-                            </label>
+                            <label class="switch"><input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)"><span class="slider round"></span></label>
                             <span id="lblCartaFestiva" class="toggle-label">Festiva</span>
                         </div>
                     </div>
-
                     <div class="form-card">
                         <h3>Agregar producto</h3>
                         <form id="formPlato" onsubmit="agregarPlato(event)">
@@ -240,44 +218,23 @@
                                 <input type="text" id="platoNombre" placeholder="Nombre" required />
                                 <input type="number" step="0.10" id="platoPrecio" placeholder="Precio S/" required />
                                 <input type="number" step="0.10" id="platoFestivo" placeholder="Festivo S/" />
-                                <select id="platoCategoria" required>
-                                    <option value="Parrillas">Parrillas</option>
-                                    <option value="Cenas">Cenas</option>
-                                    <option value="Selvaticos">Selváticos</option>
-                                    <option value="Guarniciones">Guarniciones</option>
-                                    <option value="Bebidas">Bebidas</option>
-                                </select>
+                                <select id="platoCategoria" required><option value="Parrillas">Parrillas</option><option value="Cenas">Cenas</option><option value="Selvaticos">Selváticos</option><option value="Guarniciones">Guarniciones</option><option value="Bebidas">Bebidas</option></select>
                                 <button type="submit" class="btn btn-primary">+ Agregar</button>
                             </div>
                         </form>
                     </div>
-
                     <div id="adminMenuCategoriesContainer"></div>
                 </div>
 
-                <!-- 3. TAB CLIENTES -->
-                <div id="adminTab-clientes" class="admin-tab-pane">
-                    <div class="form-card"><h3>Clientes</h3><table class="data-table"><thead><tr><th>Nombre</th><th>Teléfono</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="2">Sin registros.</td></tr></tbody></table></div>
-                </div>
-
-                <!-- 4. TAB RECOMPENSAS -->
-                <div id="adminTab-recompensas" class="admin-tab-pane">
-                    <div class="form-card"><h3>Recompensas</h3></div>
-                </div>
-
-                <!-- 5. TAB MESAS -->
+                <div id="adminTab-clientes" class="admin-tab-pane"><div class="form-card"><h3>Clientes</h3><table class="data-table"><thead><tr><th>Nombre</th><th>Teléfono</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="2">Sin registros.</td></tr></tbody></table></div></div>
+                <div id="adminTab-recompensas" class="admin-tab-pane"><div class="form-card"><h3>Recompensas</h3></div></div>
                 <div id="adminTab-mesas" class="admin-tab-pane">
                     <div class="form-card">
                         <h3>Mesas del salón</h3>
-                        <div class="form-row">
-                            <input type="number" id="nuevaMesaNum" placeholder="Número de mesa" />
-                            <button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button>
-                        </div>
+                        <div class="form-row"><input type="number" id="nuevaMesaNum" placeholder="Número de mesa" /><button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button></div>
                         <div class="admin-tables-grid" id="adminTablesGrid"></div>
                     </div>
                 </div>
-
-                <!-- 6. TAB USUARIOS -->
                 <div id="adminTab-usuarios" class="admin-tab-pane">
                     <div class="form-card">
                         <h3>Crear cuenta de trabajador</h3>
@@ -285,31 +242,15 @@
                             <div class="form-group"><label>Usuario</label><input type="text" id="usrUser" required /></div>
                             <div class="form-group"><label>Nombre completo</label><input type="text" id="usrNombre" required /></div>
                             <div class="form-group"><label>Contraseña</label><input type="password" id="usrPass" required /></div>
-                            <div class="form-group"><label>Rol</label>
-                                <select id="usrRol">
-                                    <option value="mesero">Mesero</option>
-                                    <option value="cocina">Cocina</option>
-                                    <option value="caja">Caja</option>
-                                    <option value="almacen">Almacén</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
-                            </div>
+                            <div class="form-group"><label>Rol</label><select id="usrRol"><option value="mesero">Mesero</option><option value="cocina">Cocina</option><option value="caja">Caja</option><option value="almacen">Almacén</option><option value="admin">Administrador</option></select></div>
                             <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
                         </form>
                     </div>
                 </div>
-
-                <!-- 7. TAB AJUSTES -->
-                <div id="adminTab-ajustes" class="admin-tab-pane">
-                    <div class="form-card"><h3>Ajustes de Impresoras</h3></div>
-                </div>
+                <div id="adminTab-ajustes" class="admin-tab-pane"><div class="form-card"><h3>Ajustes de Impresoras</h3></div></div>
             </section>
 
-            <!-- ==================== VISTA ALMACÉN ==================== -->
-            <section id="view-almacen" class="role-view">
-                <h2>Control de Inventario y Almacén</h2>
-            </section>
-
+            <section id="view-almacen" class="role-view"><h2>Control de Inventario y Almacén</h2></section>
         </main>
     </div>
 
