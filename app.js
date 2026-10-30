@@ -10,8 +10,11 @@ let isCartaFestiva = false;
 
 let tables = [];
 let dishes = [];
+let activeOrders = {}; // Memoria local de comandas por mesa/delivery
+let kitchenOrders = []; // Comandas enviadas a cocina
+let isJoinMode = false;
+let tablesToJoin = [];
 
-let currentOrder = [];
 let selectedTable = null;
 let dishPendingMod = null;
 
@@ -28,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarDatosDesdeSupabase();
     loadFinanzasData();
-    renderCajaView();
 });
 
 async function cargarDatosDesdeSupabase() {
@@ -54,6 +56,7 @@ async function cargarDatosDesdeSupabase() {
         renderAdminMenuCategories();
         renderAdminMesas();
         renderCajaView();
+        renderKitchenView();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
     }
@@ -135,6 +138,7 @@ function switchRoleView(role) {
     if (target) {
         target.classList.add('active');
         if (role === 'caja') renderCajaView();
+        if (role === 'cocina') renderKitchenView();
     } else {
         const defaultView = document.getElementById('view-mesero');
         if(defaultView) defaultView.classList.add('active');
@@ -149,39 +153,89 @@ function switchAdminTab(tabName, event) {
     if (pane) pane.classList.add('active');
 }
 
+// ==================== MAPA DE MESAS Y MODO UNIR ====================
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
     if (!grid) return;
     grid.innerHTML = '';
+    
     tables.forEach(table => {
         const div = document.createElement('div');
         div.className = `table-card ${table.status}`;
+        if (tablesToJoin.includes(table.id)) div.classList.add('selected-join');
+
         div.innerHTML = `<h4>${table.name}</h4><p>${table.status === 'free' ? 'Libre' : 'Ocupada'}</p>`;
-        div.onclick = () => handleTableClick(table);
+        div.onclick = () => {
+            if (isJoinMode) {
+                toggleSelectTableToJoin(table.id);
+            } else {
+                handleTableClick(table.name);
+            }
+        };
         grid.appendChild(div);
     });
 }
 
-// ==================== OCULTAR MAPA Y MOSTRAR PEDIDO ====================
-function handleTableClick(table) {
-    selectedTable = table;
-    currentOrder = []; // Limpiar comanda previa local al abrir mesa
+function toggleJoinTablesMode() {
+    isJoinMode = !isJoinMode;
+    tablesToJoin = [];
+    const btn = document.getElementById('btnJoinMode');
+    if (isJoinMode) {
+        btn.style.background = 'var(--accent-yellow)';
+        btn.style.color = '#000';
+        alert('Selecciona 2 o más mesas para unirlas.');
+    } else {
+        btn.style.background = '';
+        btn.style.color = '';
+    }
+    renderTables();
+}
 
-    // Ocultar mapa de mesas y mostrar la sección de pedidos
+function toggleSelectTableToJoin(id) {
+    if (tablesToJoin.includes(id)) {
+        tablesToJoin = tablesToJoin.filter(t => t.id !== id);
+    } else {
+        tablesToJoin.push(id);
+    }
+    if (tablesToJoin.length >= 2) {
+        const names = tables.filter(t => tablesToJoin.includes(t.id)).map(t => t.name).join(' + ');
+        alert(`Mesas unidas correctamente: ${names}`);
+        isJoinMode = false;
+        tablesToJoin = [];
+        const btn = document.getElementById('btnJoinMode');
+        btn.style.background = '';
+        btn.style.color = '';
+    }
+    renderTables();
+}
+
+function openTakeoutView() {
+    const deliveryName = "Delivery / Para Llevar #" + (Math.floor(Math.random() * 900) + 100);
+    handleTableClick(deliveryName);
+}
+
+// ==================== TOMA DE PEDIDOS Y PERSISTENCIA POR MESA ====================
+function handleTableClick(tableName) {
+    selectedTable = tableName;
+
+    // Si la mesa no tiene comanda iniciada, la inicializamos vacía
+    if (!activeOrders[selectedTable]) {
+        activeOrders[selectedTable] = [];
+    }
+
     document.getElementById('salonMapSection').classList.add('hidden');
     document.getElementById('orderSection').classList.remove('hidden');
 
-    document.getElementById('currentOrderTitle').innerText = table.name;
-    document.getElementById('cartTableTitle').innerText = table.name;
+    document.getElementById('currentOrderTitle').innerText = selectedTable;
+    document.getElementById('cartTableTitle').innerText = selectedTable;
     updateCartUI();
 }
 
 function closeOrderSection() {
-    // Volver a mostrar el mapa de mesas y ocultar la sección de pedidos
     document.getElementById('orderSection').classList.add('hidden');
     document.getElementById('salonMapSection').classList.remove('hidden');
     selectedTable = null;
-    currentOrder = [];
+    renderTables();
 }
 
 function filterCategory(cat) { renderDishes(cat); }
@@ -238,7 +292,7 @@ function closeModModal() {
 }
 
 function confirmAddToCart() {
-    if (!dishPendingMod) return;
+    if (!dishPendingMod || !selectedTable) return;
 
     let extraPrice = 0;
     let selectedOptionName = 'Original';
@@ -264,10 +318,18 @@ function confirmAddToCart() {
 
     const finalPrice = dishPendingMod.price + extraPrice;
 
-    currentOrder.push({
+    // Añadir a la comanda activa de la mesa en memoria
+    if (!activeOrders[selectedTable]) activeOrders[selectedTable] = [];
+    activeOrders[selectedTable].push({
         name: finalItemName,
         price: finalPrice
     });
+
+    // Cambiar estado de mesa a ocupada si pertenece al salón
+    const tableObj = tables.find(t => t.name === selectedTable);
+    if (tableObj) {
+        tableObj.status = 'occupied';
+    }
 
     updateCartUI();
     closeModModal();
@@ -275,14 +337,21 @@ function confirmAddToCart() {
 
 function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
-    if (!itemsContainer) return;
+    if (!itemsContainer || !selectedTable) return;
     
+    const currentOrder = activeOrders[selectedTable] || [];
+
     if (currentOrder.length === 0) {
         itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
     } else {
         itemsContainer.innerHTML = '';
-        currentOrder.forEach(item => {
-            itemsContainer.innerHTML += `<div style="padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${item.name} - S/ ${item.price.toFixed(2)}</div>`;
+        currentOrder.forEach((item, index) => {
+            itemsContainer.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <span>${item.name} - S/ ${item.price.toFixed(2)}</span>
+                    <button class="btn btn-secondary btn-sm" onclick="removeItemFromOrder(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>
+                </div>
+            `;
         });
     }
 
@@ -291,6 +360,114 @@ function updateCartUI() {
     if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
+function removeItemFromOrder(index) {
+    if (!selectedTable) return;
+    activeOrders[selectedTable].splice(index, 1);
+    updateCartUI();
+}
+
+// ==================== ENVIAR A COCINA ====================
+function enviarPedidoACocina() {
+    if (!selectedTable || !activeOrders[selectedTable] || activeOrders[selectedTable].length === 0) {
+        alert('No hay platos en la comanda para enviar.');
+        return;
+    }
+
+    const orderData = {
+        id: Date.now(),
+        table: selectedTable,
+        items: [...activeOrders[selectedTable]],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'pending' // pending, preparing, delivered
+    };
+
+    kitchenOrders.push(orderData);
+    alert(`¡Pedido de ${selectedTable} enviado a cocina con éxito!`);
+    
+    closeOrderSection();
+    renderKitchenView();
+    renderCajaView();
+}
+
+// ==================== KDS COCINA (COLUMNAS VERTICALES) ====================
+function renderKitchenView() {
+    const pendingList = document.getElementById('kdsPending');
+    const preparingList = document.getElementById('kdsPreparing');
+    const deliveredList = document.getElementById('kdsDelivered');
+
+    if (!pendingList || !preparingList || !deliveredList) return;
+
+    pendingList.innerHTML = '';
+    preparingList.innerHTML = '';
+    deliveredList.innerHTML = '';
+
+    kitchenOrders.forEach(ord => {
+        let itemsHtml = ord.items.map(i => `<li>${i.name}</li>`).join('');
+        const cardHtml = `
+            <div class="kds-ticket">
+                <h5>🍽️ ${ord.table}</h5>
+                <p>Hora: ${ord.time}</p>
+                <ul>${itemsHtml}</ul>
+                <div style="margin-top: 0.8rem; display:flex; gap:0.5rem;">
+                    ${ord.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${ord.id}, 'preparing')">Preparar ➔</button>` : ''}
+                    ${ord.status === 'preparing' ? `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${ord.id}, 'delivered')">Entregar ✓</button>` : ''}
+                </div>
+            </div>
+        `;
+
+        if (ord.status === 'pending') pendingList.innerHTML += cardHtml;
+        if (ord.status === 'preparing') preparingList.innerHTML += cardHtml;
+        if (ord.status === 'delivered') deliveredList.innerHTML += cardHtml;
+    });
+}
+
+function updateOrderStatus(id, newStatus) {
+    const order = kitchenOrders.find(o => o.id === id);
+    if (order) {
+        order.status = newStatus;
+        renderKitchenView();
+    }
+}
+
+// ==================== VISTA CAJA ====================
+function renderCajaView() {
+    const grid = document.getElementById('cajaCardsGrid');
+    if (!grid) return;
+
+    let totalCuentas = Object.keys(activeOrders).filter(k => activeOrders[k].length > 0).length;
+    let totalCobrar = 0;
+    let salonCount = 0;
+    let llevarCount = 0;
+
+    grid.innerHTML = '';
+    
+    Object.keys(activeOrders).forEach(tableName => {
+        const items = activeOrders[tableName];
+        if (items.length > 0) {
+            let subtotal = items.reduce((acc, i) => acc + i.price, 0);
+            totalCobrar += subtotal;
+
+            if (tableName.includes('Delivery')) llevarCount++;
+            else salonCount++;
+
+            grid.innerHTML += `
+                <div class="caja-ticket-card">
+                    <div class="ticket-header">
+                        <span>🍽️ ${tableName}</span>
+                    </div>
+                    <div class="ticket-time">Ítems: ${items.length}</div>
+                    <div class="ticket-price">S/ ${subtotal.toFixed(2)}</div>
+                </div>
+            `;
+        }
+    });
+
+    document.getElementById('cajaTotalCuentas').innerText = totalCuentas;
+    document.getElementById('cajaSalonLlevar').innerText = `${salonCount} / ${llevarCount}`;
+    document.getElementById('cajaPorCobrar').innerText = `S/ ${totalCobrar.toFixed(2)}`;
+}
+
+// ==================== CARTA Y CONFIGURACIÓN ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
     const lblNormal = document.getElementById('lblCartaNormal');
@@ -305,41 +482,6 @@ function toggleCartaFestiva(isFestiva) {
     }
 
     renderDishes('Todas');
-}
-
-function renderCajaView() {
-    const grid = document.getElementById('cajaCardsGrid');
-    if (!grid) return;
-
-    const activeTickets = [
-        { id: 2, type: 'salon', name: 'Mesa 2', time: '09:26 p. m.', total: 22.00, tapers: 0 },
-        { id: 15, type: 'salon', name: 'Mesa 15', time: '07:50 p. m.', total: 212.00, tapers: 13 },
-        { id: 100, type: 'llevar', name: 'Para Llevar', time: '10:39 p. m.', total: 17.00, tapers: 2 },
-        { id: 1, type: 'salon', name: 'Mesa 1', time: '11:19 p. m.', total: 5.00, tapers: 0 }
-    ];
-
-    let salonCount = activeTickets.filter(t => t.type === 'salon').length;
-    let llevarCount = activeTickets.filter(t => t.type === 'llevar').length;
-    let totalCobrar = activeTickets.reduce((acc, t) => acc + t.total, 0);
-
-    document.getElementById('cajaTotalCuentas').innerText = activeTickets.length;
-    document.getElementById('cajaSalonLlevar').innerText = `${salonCount} / ${llevarCount}`;
-    document.getElementById('cajaPorCobrar').innerText = `S/ ${totalCobrar.toFixed(2)}`;
-
-    grid.innerHTML = '';
-    activeTickets.forEach(ticket => {
-        const div = document.createElement('div');
-        div.className = 'caja-ticket-card';
-        div.innerHTML = `
-            <div class="ticket-header">
-                <span>🍽️ ${ticket.name}</span>
-            </div>
-            <div class="ticket-time">Abierta ${ticket.time}</div>
-            <div class="ticket-price">S/ ${ticket.total.toFixed(2)}</div>
-            ${ticket.tapers > 0 ? `<div class="taper-badge">Táper × ${ticket.tapers}</div>` : ''}
-        `;
-        grid.appendChild(div);
-    });
 }
 
 async function registrarGasto(event) {
