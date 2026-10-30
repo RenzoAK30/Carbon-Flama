@@ -10,8 +10,8 @@ let isCartaFestiva = false;
 
 let tables = [];
 let dishes = [];
-let activeOrders = {}; // Memoria local de comandas por mesa/delivery
-let kitchenOrders = []; // Comandas enviadas a cocina
+let activeOrders = {}; // Comandas locales en curso por mesa
+let kitchenOrders = []; // Comandas sincronizadas para cocina
 let isJoinMode = false;
 let tablesToJoin = [];
 
@@ -51,15 +51,39 @@ async function cargarDatosDesdeSupabase() {
             }));
         }
 
+        // Cargar comandas activas desde Supabase para persistencia entre sesiones
+        await sincronizarComandasDesdeDB();
+
         renderTables();
         renderDishes('Todas');
         renderAdminMenuCategories();
         renderAdminMesas();
-        renderCajaView();
-        renderKitchenView();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
     }
+}
+
+async function sincronizarComandasDesdeDB() {
+    const { data: coms, error } = await db.from('comandas').select('*, items_comanda(*)');
+    if (!error && coms) {
+        kitchenOrders = coms.map(c => ({
+            id: c.id,
+            table: c.mesa,
+            status: c.estado,
+            time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            items: c.items_comanda.map(i => ({ name: i.nombre_plato, price: parseFloat(i.precio) }))
+        }));
+
+        // Actualizar estado ocupado en mesas del salón
+        coms.forEach(c => {
+            if (c.estado !== 'cobrado') {
+                const t = tables.find(tb => tb.name === c.mesa);
+                if (t) t.status = 'occupied';
+            }
+        });
+    }
+    renderCajaView();
+    renderKitchenView();
 }
 
 async function handleLogin(event) {
@@ -214,13 +238,15 @@ function openTakeoutView() {
     handleTableClick(deliveryName);
 }
 
-// ==================== TOMA DE PEDIDOS Y PERSISTENCIA POR MESA ====================
+// ==================== TOMA DE PEDIDOS Y PERSISTENCIA ====================
 function handleTableClick(tableName) {
     selectedTable = tableName;
 
-    // Si la mesa no tiene comanda iniciada, la inicializamos vacía
+    // Inicializar comanda local si no existe
     if (!activeOrders[selectedTable]) {
-        activeOrders[selectedTable] = [];
+        // Verificar si ya hay platos enviados en cocina para esta mesa
+        const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'delivered');
+        activeOrders[selectedTable] = existingOrder ? [...existingOrder.items] : [];
     }
 
     document.getElementById('salonMapSection').classList.add('hidden');
@@ -318,14 +344,13 @@ function confirmAddToCart() {
 
     const finalPrice = dishPendingMod.price + extraPrice;
 
-    // Añadir a la comanda activa de la mesa en memoria
     if (!activeOrders[selectedTable]) activeOrders[selectedTable] = [];
     activeOrders[selectedTable].push({
         name: finalItemName,
         price: finalPrice
     });
 
-    // Cambiar estado de mesa a ocupada si pertenece al salón
+    // Cambiar estado de mesa a ocupada en memoria visual
     const tableObj = tables.find(t => t.name === selectedTable);
     if (tableObj) {
         tableObj.status = 'occupied';
@@ -366,27 +391,46 @@ function removeItemFromOrder(index) {
     updateCartUI();
 }
 
-// ==================== ENVIAR A COCINA ====================
-function enviarPedidoACocina() {
+// ==================== ENVIAR A COCINA Y SUPABASE ====================
+async function enviarPedidoACocina() {
     if (!selectedTable || !activeOrders[selectedTable] || activeOrders[selectedTable].length === 0) {
         alert('No hay platos en la comanda para enviar.');
         return;
     }
 
-    const orderData = {
-        id: Date.now(),
-        table: selectedTable,
-        items: [...activeOrders[selectedTable]],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'pending' // pending, preparing, delivered
-    };
+    const items = activeOrders[selectedTable];
+    const totalMonto = items.reduce((acc, i) => acc + i.price, 0);
 
-    kitchenOrders.push(orderData);
-    alert(`¡Pedido de ${selectedTable} enviado a cocina con éxito!`);
+    // 1. Guardar comanda principal en Supabase
+    const { data: comandaRes, error: errComanda } = await db
+        .from('comandas')
+        .insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }])
+        .select();
+
+    if (errComanda) {
+        alert('Error al enviar pedido a cocina: ' + errComanda.message);
+        return;
+    }
+
+    const comandaId = comandaRes[0].id;
+
+    // 2. Guardar cada ítem del plato en Supabase
+    const itemsToInsert = items.map(i => ({
+        comanda_id: comandaId,
+        nombre_plato: i.name,
+        precio: i.price
+    }));
+
+    const { error: errItems } = await db.from('items_comanda').insert(itemsToInsert);
+    if (errItems) {
+        alert('Error al registrar ítems: ' + errItems.message);
+        return;
+    }
+
+    alert(`¡Pedido de ${selectedTable} enviado a cocina correctamente!`);
     
     closeOrderSection();
-    renderKitchenView();
-    renderCajaView();
+    await sincronizarComandasDesdeDB();
 }
 
 // ==================== KDS COCINA (COLUMNAS VERTICALES) ====================
@@ -409,23 +453,22 @@ function renderKitchenView() {
                 <p>Hora: ${ord.time}</p>
                 <ul>${itemsHtml}</ul>
                 <div style="margin-top: 0.8rem; display:flex; gap:0.5rem;">
-                    ${ord.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${ord.id}, 'preparing')">Preparar ➔</button>` : ''}
-                    ${ord.status === 'preparing' ? `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${ord.id}, 'delivered')">Entregar ✓</button>` : ''}
+                    ${ord.status === 'pendiente' ? `<button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${ord.id}, 'preparando')">Preparar ➔</button>` : ''}
+                    ${ord.status === 'preparando' ? `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${ord.id}, 'entregado')">Entregar ✓</button>` : ''}
                 </div>
             </div>
         `;
 
-        if (ord.status === 'pending') pendingList.innerHTML += cardHtml;
-        if (ord.status === 'preparing') preparingList.innerHTML += cardHtml;
-        if (ord.status === 'delivered') deliveredList.innerHTML += cardHtml;
+        if (ord.status === 'pendiente') pendingList.innerHTML += cardHtml;
+        if (ord.status === 'preparando') preparingList.innerHTML += cardHtml;
+        if (ord.status === 'entregado') deliveredList.innerHTML += cardHtml;
     });
 }
 
-function updateOrderStatus(id, newStatus) {
-    const order = kitchenOrders.find(o => o.id === id);
-    if (order) {
-        order.status = newStatus;
-        renderKitchenView();
+async function updateOrderStatus(id, newStatus) {
+    const { error } = await db.from('comandas').update({ estado: newStatus }).eq('id', id);
+    if (!error) {
+        await sincronizarComandasDesdeDB();
     }
 }
 
@@ -434,37 +477,32 @@ function renderCajaView() {
     const grid = document.getElementById('cajaCardsGrid');
     if (!grid) return;
 
-    let totalCuentas = Object.keys(activeOrders).filter(k => activeOrders[k].length > 0).length;
-    let totalCobrar = 0;
-    let salonCount = 0;
-    let llevarCount = 0;
+    const activeTickets = kitchenOrders.filter(o => o.status !== 'cobrado');
 
-    grid.innerHTML = '';
-    
-    Object.keys(activeOrders).forEach(tableName => {
-        const items = activeOrders[tableName];
-        if (items.length > 0) {
-            let subtotal = items.reduce((acc, i) => acc + i.price, 0);
-            totalCobrar += subtotal;
+    let salonCount = activeTickets.filter(t => !t.table.includes('Delivery')).length;
+    let llevarCount = activeTickets.filter(t => t.table.includes('Delivery')).length;
+    let totalCobrar = activeTickets.reduce((acc, t) => {
+        let tSum = t.items.reduce((sum, i) => sum + i.price, 0);
+        return acc + tSum;
+    }, 0);
 
-            if (tableName.includes('Delivery')) llevarCount++;
-            else salonCount++;
-
-            grid.innerHTML += `
-                <div class="caja-ticket-card">
-                    <div class="ticket-header">
-                        <span>🍽️ ${tableName}</span>
-                    </div>
-                    <div class="ticket-time">Ítems: ${items.length}</div>
-                    <div class="ticket-price">S/ ${subtotal.toFixed(2)}</div>
-                </div>
-            `;
-        }
-    });
-
-    document.getElementById('cajaTotalCuentas').innerText = totalCuentas;
+    document.getElementById('cajaTotalCuentas').innerText = activeTickets.length;
     document.getElementById('cajaSalonLlevar').innerText = `${salonCount} / ${llevarCount}`;
     document.getElementById('cajaPorCobrar').innerText = `S/ ${totalCobrar.toFixed(2)}`;
+
+    grid.innerHTML = '';
+    activeTickets.forEach(ticket => {
+        let ticketTotal = ticket.items.reduce((sum, i) => sum + i.price, 0);
+        grid.innerHTML += `
+            <div class="caja-ticket-card">
+                <div class="ticket-header">
+                    <span>🍽️ ${ticket.table}</span>
+                </div>
+                <div class="ticket-time">Abierta ${ticket.time}</div>
+                <div class="ticket-price">S/ ${ticketTotal.toFixed(2)}</div>
+            </div>
+        `;
+    });
 }
 
 // ==================== CARTA Y CONFIGURACIÓN ====================
