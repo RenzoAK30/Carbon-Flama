@@ -591,7 +591,8 @@ async function loadFinanzasData() {
         let totalVentas = 0;
         if (!errC && comandasCobradas) {
             // Si la columna total está en 0 por cierres pasados, sumamos los ítems cobrados o respaldamos con histórico
-            totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), desglosarTotalVentas(c.id)), 0);
+            //totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), desglosarTotalVentas(c.id)), 0);
+			totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), 0);
         }
 
         // 2. Obtener gastos operativos
