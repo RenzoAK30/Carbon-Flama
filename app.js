@@ -13,6 +13,7 @@ let dishes = [];
 
 let currentOrder = [];
 let selectedTable = null;
+let dishPendingMod = null; // Plato seleccionado temporalmente para el modal de modificadores
 
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarDatosDesdeSupabase();
     loadFinanzasData();
+    renderCajaView();
 });
 
 // Cargar mesas y platos dinámicamente desde Supabase
@@ -50,8 +52,9 @@ async function cargarDatosDesdeSupabase() {
 
         renderTables();
         renderDishes('Todas');
-        renderAdminMenu();
+        renderAdminMenuCategories();
         renderAdminMesas();
+        renderCajaView();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
     }
@@ -117,7 +120,6 @@ function activarSesion(perfil) {
         userNameEl.innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
     }
 
-    // Asignar automáticamente la vista según el rol devuelto por la base de datos
     switchRoleView(perfil.rol);
 }
 
@@ -130,15 +132,12 @@ function switchRoleView(role) {
     currentRole = role;
     document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
     
-    // Mapeo directo del rol del usuario a su respectiva vista
     let vistaId = `view-${role}`;
-    
-    // Si el rol es admin, activamos la vista de administración
     const target = document.getElementById(vistaId);
     if (target) {
         target.classList.add('active');
+        if (role === 'caja') renderCajaView();
     } else {
-        // Por defecto si hay discrepancia, muestra mesero
         const defaultView = document.getElementById('view-mesero');
         if(defaultView) defaultView.classList.add('active');
     }
@@ -191,14 +190,81 @@ function renderDishes(cat) {
         const div = document.createElement('div');
         div.className = 'dish-card';
         div.innerHTML = `<h5>${dish.name}</h5><p>S/ ${currentPrice.toFixed(2)}</p>`;
-        div.onclick = () => addToCart({ ...dish, price: currentPrice });
+        // Al hacer clic, abre la ventana emergente de modificadores
+        div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
     });
 }
 
-function addToCart(dish) {
-    currentOrder.push(dish);
+// ==================== MODAL DE MODIFICADORES (VENTANA EMERGENTE) ====================
+function openModModal(dish) {
+    dishPendingMod = dish;
+    document.getElementById('modalDishName').innerText = dish.name;
+    document.getElementById('modalDishCategory').innerText = `Categoría: ${dish.category} - Base: S/ ${dish.price.toFixed(2)}`;
+    document.getElementById('modalComment').value = '';
+
+    const container = document.getElementById('modifiersContainer');
+    container.innerHTML = '';
+
+    let optionsHtml = '';
+    if (dish.category === 'Parrillas') {
+        optionsHtml = `
+            <label class="modifier-option"><input type="radio" name="modOption" value="Original" checked> Original (+ S/ 0.00)</label>
+            <label class="modifier-option"><input type="radio" name="modOption" value="Arroz blanco"> Arroz blanco (+ S/ 3.00)</label>
+            <label class="modifier-option"><input type="radio" name="modOption" value="Arroz Chaufa"> Arroz Chaufa (+ S/ 5.00)</label>
+        `;
+    } else if (dish.category === 'Cenas') {
+        optionsHtml = `
+            <label class="modifier-option"><input type="radio" name="modOption" value="Original" checked> Original (+ S/ 0.00)</label>
+            <label class="modifier-option"><input type="radio" name="modOption" value="Arroz Chaufa"> Arroz Chaufa (+ S/ 3.00)</label>
+        `;
+    } else {
+        optionsHtml = `<p class="text-muted">Este producto no requiere modificadores de acompañamiento.</p>`;
+    }
+
+    container.innerHTML = optionsHtml;
+    document.getElementById('modModal').classList.remove('hidden');
+}
+
+function closeModModal() {
+    document.getElementById('modModal').classList.add('hidden');
+    dishPendingMod = null;
+}
+
+function confirmAddToCart() {
+    if (!dishPendingMod) return;
+
+    let extraPrice = 0;
+    let selectedOptionName = 'Original';
+
+    const selectedRadio = document.querySelector('input[name="modOption"]:checked');
+    if (selectedRadio) {
+        selectedOptionName = selectedRadio.value;
+        if (selectedOptionName === 'Arroz blanco') extraPrice = 3.00;
+        if (selectedOptionName === 'Arroz Chaufa') {
+            extraPrice = dishPendingMod.category === 'Parrillas' ? 5.00 : 3.00;
+        }
+    }
+
+    const comment = document.getElementById('modalComment').value.trim();
+    
+    let finalItemName = dishPendingMod.name;
+    if (selectedOptionName !== 'Original') {
+        finalItemName += ` (${selectedOptionName})`;
+    }
+    if (comment) {
+        finalItemName += ` [Nota: ${comment}]`;
+    }
+
+    const finalPrice = dishPendingMod.price + extraPrice;
+
+    currentOrder.push({
+        name: finalItemName,
+        price: finalPrice
+    });
+
     updateCartUI();
+    closeModModal();
 }
 
 function updateCartUI() {
@@ -213,14 +279,61 @@ function updateCartUI() {
     const subTotalEl = document.getElementById('cartSubtotal');
     const totalEl = document.getElementById('cartTotal');
     if (subTotalEl) subTotalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
-    if (totalEl) totalEl.innerText = `S/ ${total.toFixed(2)}`;
+    if (totalEl) totalEl.innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
+// ==================== CARTA ACTIVA CON SWITCH DESLIZABLE ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
-    const lbl = document.getElementById('lblCartaStatus');
-    if (lbl) lbl.innerText = isFestiva ? 'FESTIVA' : 'NORMAL';
+    const lblNormal = document.getElementById('lblCartaNormal');
+    const lblFestiva = document.getElementById('lblCartaFestiva');
+
+    if (isFestiva) {
+        lblNormal.classList.remove('active');
+        lblFestiva.classList.add('active');
+    } else {
+        lblFestiva.classList.remove('active');
+        lblNormal.classList.add('active');
+    }
+
     renderDishes('Todas');
+}
+
+// ==================== VISTA CAJA (DISEÑO SOLICITADO) ====================
+function renderCajaView() {
+    const grid = document.getElementById('cajaCardsGrid');
+    if (!grid) return;
+
+    // Datos simulados en tiempo real alineados al diseño de referencia
+    const activeTickets = [
+        { id: 2, type: 'salon', name: 'Mesa 2', time: '09:26 p. m.', total: 22.00, tapers: 0 },
+        { id: 15, type: 'salon', name: 'Mesa 15', time: '07:50 p. m.', total: 212.00, tapers: 13 },
+        { id: 100, type: 'llevar', name: 'Para Llevar', time: '10:39 p. m.', total: 17.00, tapers: 2 },
+        { id: 1, type: 'salon', name: 'Mesa 1', time: '11:19 p. m.', total: 5.00, tapers: 0 }
+    ];
+
+    let salonCount = activeTickets.filter(t => t.type === 'salon').length;
+    let llevarCount = activeTickets.filter(t => t.type === 'llevar').length;
+    let totalCobrar = activeTickets.reduce((acc, t) => acc + t.total, 0);
+
+    document.getElementById('cajaTotalCuentas').innerText = activeTickets.length;
+    document.getElementById('cajaSalonLlevar').innerText = `${salonCount} / ${llevarCount}`;
+    document.getElementById('cajaPorCobrar').innerText = `S/ ${totalCobrar.toFixed(2)}`;
+
+    grid.innerHTML = '';
+    activeTickets.forEach(ticket => {
+        const div = document.createElement('div');
+        div.className = 'caja-ticket-card';
+        div.innerHTML = `
+            <div class="ticket-header">
+                <span>🍽️ ${ticket.name}</span>
+            </div>
+            <div class="ticket-time">Abierta ${ticket.time}</div>
+            <div class="ticket-price">S/ ${ticket.total.toFixed(2)}</div>
+            ${ticket.tapers > 0 ? `<div class="taper-badge">Táper × ${ticket.tapers}</div>` : ''}
+        `;
+        grid.appendChild(div);
+    });
 }
 
 async function registrarGasto(event) {
@@ -261,12 +374,43 @@ async function agregarPlato(event) {
     }
 }
 
-function renderAdminMenu() {
-    const container = document.getElementById('adminMenuListContainer');
+// ==================== CARTA ADMINISTRADOR SEPARADA POR CATEGORÍAS ====================
+function renderAdminMenuCategories() {
+    const container = document.getElementById('adminMenuCategoriesContainer');
     if (!container) return;
     container.innerHTML = '';
-    dishes.forEach(d => {
-        container.innerHTML += `<div class="form-card"><strong>${d.name}</strong> - Normal: S/${d.price} | Festivo: S/${d.festivo} (${d.category})</div>`;
+
+    const categoriasUnicas = ['Parrillas', 'Cenas', 'Selvaticos', 'Guarniciones', 'Bebidas'];
+
+    categoriasUnicas.forEach(cat => {
+        const platosCat = dishes.filter(d => d.category === cat);
+        
+        let itemsHtml = '';
+        if (platosCat.length === 0) {
+            itemsHtml = `<p class="text-muted" style="padding: 0.5rem 0;">No hay productos en esta categoría.</p>`;
+        } else {
+            platosCat.forEach(d => {
+                itemsHtml += `
+                    <div class="menu-item-row">
+                        <span>${d.name}</span>
+                        <div style="text-align: right;">
+                            <span class="menu-item-prices">S/ ${d.price.toFixed(2)}</span>
+                            <div class="menu-item-fest">Fest. S/ ${d.festivo.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        container.innerHTML += `
+            <div class="admin-category-section">
+                <div class="admin-category-title">
+                    <span>${cat}</span>
+                    <span class="text-muted" style="font-size:0.85rem;">${platosCat.length} ítems</span>
+                </div>
+                ${itemsHtml}
+            </div>
+        `;
     });
 }
 

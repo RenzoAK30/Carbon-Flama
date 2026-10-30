@@ -22,12 +22,55 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .brand-logo { width: 45px; height: 45px; object-fit: contain; }
 
 .user-info-bar { display: flex; align-items: center; gap: 1rem; }
-.role-selector-container select { padding: 0.4rem 0.8rem; border-radius: 6px; background: #2b2d42; color: #fff; border: 1px solid var(--border-color); }
-
 .container { padding: 2rem; }
 .role-view { display: none; }
 .role-view.active { display: block; }
 
+/* Modal de Modificadores */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-card { background: var(--card-bg); padding: 2rem; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.modifiers-options { display: flex; flex-direction: column; gap: 0.8rem; margin: 1rem 0; }
+.modifier-option { display: flex; align-items: center; gap: 0.8rem; background: #1e1e24; padding: 0.8rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); }
+.modifier-option input { accent-color: var(--primary-color); width: 18px; height: 18px; }
+.modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; }
+.mt-3 { margin-top: 1rem; }
+.text-muted { color: #a0a0a0; font-size: 0.85rem; }
+
+/* Estilos específicos para Vista Caja (Estilo Referencia) */
+.caja-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+.caja-kpi-group { display: flex; gap: 1rem; }
+.caja-kpi-pill { background: var(--card-bg); border: 1px solid var(--border-color); padding: 0.6rem 1.2rem; border-radius: 10px; display: flex; flex-direction: column; align-items: center; min-width: 110px; }
+.caja-kpi-pill.highlight { border-color: var(--primary-color); background: rgba(211, 84, 0, 0.1); }
+.kpi-label { font-size: 0.8rem; color: #a0a0a0; }
+.kpi-value { font-size: 1.1rem; font-weight: 700; color: #fff; }
+.caja-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
+.caja-ticket-card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 600; font-size: 1.1rem; }
+.ticket-time { font-size: 0.85rem; color: #a0a0a0; margin-bottom: 1rem; }
+.ticket-price { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); }
+.taper-badge { background: #3d405b; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem; display: inline-block; margin-top: 0.8rem; }
+
+/* Switch Deslizable moderno para Carta Activa */
+.carta-config-card { display: flex; justify-content: space-between; align-items: center; }
+.carta-toggle-container { display: flex; align-items: center; gap: 1rem; }
+.toggle-label { font-weight: 600; font-size: 0.9rem; color: #a0a0a0; }
+.toggle-label.active { color: var(--text-color); }
+.switch { position: relative; display: inline-block; width: 55px; height: 28px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4a4e69; transition: .3s; border-radius: 34px; }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--primary-color); }
+input:checked + .slider:before { transform: translateX(27px); }
+
+/* Secciones de categorías en Administración (Menú) */
+.admin-category-section { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color); }
+.admin-category-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+.menu-item-row { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.menu-item-row:last-child { border-bottom: none; }
+.menu-item-prices { font-weight: 600; color: var(--primary-color); }
+.menu-item-fest { font-size: 0.8rem; color: #a0a0a0; font-weight: 400; }
+
+/* Tabs Administrador */
 .admin-tabs-bar { display: flex; gap: 0.5rem; background: #111217; padding: 0.5rem; border-radius: 8px; margin: 1.5rem 0; overflow-x: auto; }
 .admin-tab-btn { background: transparent; border: none; color: var(--text-color); padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 500; }
 .admin-tab-btn.active { background: var(--primary-color); color: #fff; }

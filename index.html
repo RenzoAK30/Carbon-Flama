@@ -33,6 +33,28 @@
         </div>
     </div>
 
+    <!-- ==================== MODAL DE MODIFICADORES / EXTRAS (MESERO) ==================== -->
+    <div id="modModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3 id="modalDishName">Personalizar Plato</h3>
+            <p id="modalDishCategory" class="text-muted"></p>
+            
+            <div id="modifiersContainer" class="modifiers-options">
+                <!-- Opciones dinámicas según categoría -->
+            </div>
+
+            <div class="form-group mt-3">
+                <label>Comentario / Presa específica:</label>
+                <input type="text" id="modalComment" placeholder="Ej: Pecho, bien jugoso, sin ensalada..." />
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmAddToCart()">Añadir a Comanda</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== APLICACIÓN PRINCIPAL ==================== -->
     <div id="appView" class="hidden">
         <header class="top-bar">
@@ -128,14 +150,31 @@
                 </div>
             </section>
 
-            <!-- ==================== VISTA CAJA ==================== -->
+            <!-- ==================== VISTA CAJA (DISEÑO SOLICITADO) ==================== -->
             <section id="view-caja" class="role-view">
-                <h2>Caja y Emisión de Comprobantes</h2>
-                <div class="caja-grid">
-                    <div class="caja-tables-list">
-                        <h3>Mesas Ocupadas por Cobrar</h3>
-                        <div id="cajaPendingList" class="cards-list"></div>
+                <div class="caja-top-header">
+                    <div>
+                        <h2>Caja</h2>
+                        <p class="text-muted">Cuentas activas en tiempo real</p>
                     </div>
+                    <div class="caja-kpi-group">
+                        <div class="caja-kpi-pill">
+                            <span class="kpi-label">Cuentas</span>
+                            <span class="kpi-value" id="cajaTotalCuentas">4</span>
+                        </div>
+                        <div class="caja-kpi-pill">
+                            <span class="kpi-label">Salón / Llevar</span>
+                            <span class="kpi-value" id="cajaSalonLlevar">3 / 1</span>
+                        </div>
+                        <div class="caja-kpi-pill highlight">
+                            <span class="kpi-label">Por cobrar</span>
+                            <span class="kpi-value" id="cajaPorCobrar">S/ 256.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="caja-cards-grid" id="cajaCardsGrid">
+                    <!-- Tarjetas de cuentas activas en tiempo real -->
                 </div>
             </section>
 
@@ -181,19 +220,23 @@
                     </div>
                 </div>
 
-                <!-- 2. TAB MENÚ -->
+                <!-- 2. TAB MENÚ (SEPARADO POR CATEGORÍAS + SWITCH DESLIZABLE) -->
                 <div id="adminTab-menu" class="admin-tab-pane">
-                    <div class="form-card">
-                        <h3>Carta activa</h3>
-                        <div class="carta-toggle-row">
-                            <span id="lblCartaStatus">NORMAL</span>
+                    <div class="form-card carta-config-card">
+                        <div class="carta-config-info">
+                            <h3>Carta activa</h3>
+                            <p class="text-muted">Cambia entre precios normales y festivos instantáneamente</p>
+                        </div>
+                        <div class="carta-toggle-container">
+                            <span id="lblCartaNormal" class="toggle-label active">NORMAL</span>
                             <label class="switch">
                                 <input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)">
                                 <span class="slider round"></span>
                             </label>
-                            <span>Festiva</span>
+                            <span id="lblCartaFestiva" class="toggle-label">Festiva</span>
                         </div>
                     </div>
+
                     <div class="form-card">
                         <h3>Agregar producto</h3>
                         <form id="formPlato" onsubmit="agregarPlato(event)">
@@ -212,7 +255,9 @@
                             </div>
                         </form>
                     </div>
-                    <div id="adminMenuListContainer"></div>
+
+                    <!-- Contenedor donde se agruparán los platos por categoría -->
+                    <div id="adminMenuCategoriesContainer"></div>
                 </div>
 
                 <!-- 3. TAB CLIENTES -->
