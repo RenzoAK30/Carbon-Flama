@@ -1,8 +1,7 @@
-// Configuración y conexión segura con Supabase (Evita redeclaraciones)
+// Configuración de Supabase
 const SUPABASE_URL = 'https://vticelayfgcpbrvhjmsy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0aWNlbGF5ZmdjcGJydmhqbXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTkzNzksImV4cCI6MjEwODY5NTM3OX0.BaA9zKh1shxkUoa1zm6ReBVemOIOw1iyX97EdPOkZHs';
 
-// Usamos window.supabaseClient para evitar chocar con nombres globales de la librería CDN
 window.supabaseClient = window.supabaseClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const db = window.supabaseClient;
 
@@ -118,9 +117,7 @@ function activarSesion(perfil) {
         userNameEl.innerText = `${perfil.nombre_completo} (${perfil.rol.toUpperCase()})`;
     }
 
-    const roleSelect = document.getElementById('roleSelect');
-    if (roleSelect) roleSelect.value = perfil.rol;
-    
+    // Asignar automáticamente la vista según el rol devuelto por la base de datos
     switchRoleView(perfil.rol);
 }
 
@@ -132,8 +129,19 @@ function handleLogout() {
 function switchRoleView(role) {
     currentRole = role;
     document.querySelectorAll('.role-view').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById(`view-${role}`);
-    if (target) target.classList.add('active');
+    
+    // Mapeo directo del rol del usuario a su respectiva vista
+    let vistaId = `view-${role}`;
+    
+    // Si el rol es admin, activamos la vista de administración
+    const target = document.getElementById(vistaId);
+    if (target) {
+        target.classList.add('active');
+    } else {
+        // Por defecto si hay discrepancia, muestra mesero
+        const defaultView = document.getElementById('view-mesero');
+        if(defaultView) defaultView.classList.add('active');
+    }
 }
 
 function switchAdminTab(tabName, event) {

@@ -42,16 +42,6 @@
             </div>
             <div class="user-info-bar">
                 <span id="loggedUserName">Usuario</span>
-                <div class="role-selector-container">
-                    <label for="roleSelect">Vista / Rol:</label>
-                    <select id="roleSelect" onchange="switchRoleView(this.value)">
-                        <option value="admin">Administrador</option>
-                        <option value="mesero" selected>Mesero / Salón</option>
-                        <option value="cocina">Cocina (KDS)</option>
-                        <option value="caja">Caja & Cobros</option>
-                        <option value="almacen">Almacén e Inventario</option>
-                    </select>
-                </div>
                 <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Cerrar Sesión</button>
             </div>
         </header>
@@ -59,7 +49,7 @@
         <main class="container">
 
             <!-- ==================== VISTA MESERO ==================== -->
-            <section id="view-mesero" class="role-view active">
+            <section id="view-mesero" class="role-view">
                 <div class="salon-header">
                     <h2>Mapa de Mesas</h2>
                     <div class="table-actions">
