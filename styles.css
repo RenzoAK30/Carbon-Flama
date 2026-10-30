@@ -50,11 +50,13 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .modifiers-options { display: flex; flex-direction: column; gap: 0.8rem; margin: 1rem 0; }
 .modifier-option { display: flex; align-items: center; gap: 0.8rem; background: #1e1e24; padding: 0.8rem; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); }
 .modifier-option input { accent-color: var(--primary-color); width: 18px; height: 18px; }
-.modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; }
+.modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end; flex-wrap: wrap; }
 .mt-2 { margin-top: 0.5rem; }
 .mt-3 { margin-top: 1rem; }
+.mr-2 { margin-right: 0.5rem; }
 .text-muted { color: #a0a0a0; font-size: 0.85rem; }
 .text-center { text-align: center; }
+.loyalty-tag { background: #3d405b; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem; color: #fff; }
 
 /* Vista Caja y Detalle de Cuentas Separadas */
 .caja-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
@@ -100,8 +102,8 @@ input:checked + .slider:before { transform: translateX(27px); }
 .admin-tab-pane.active { display: block; }
 
 .form-card { background: var(--card-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-color); }
-.form-row { display: flex; gap: 1rem; margin-top: 1rem; align-items: center; }
-.form-row input, .form-row select, .form-group input, .form-group select { flex: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); background: #1e1e24; color: #fff; }
+.form-row { display: flex; gap: 1rem; margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+.form-row input, .form-row select, .form-group input, .form-group select { flex: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); background: #1e1e24; color: #fff; min-width: 150px; }
 .form-group { margin-bottom: 1rem; text-align: left; }
 .form-group label { display: block; margin-bottom: 0.3rem; font-size: 0.9rem; }
 
@@ -113,6 +115,7 @@ input:checked + .slider:before { transform: translateX(27px); }
 .pos-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-top: 1rem; }
 .dishes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-top: 1rem; }
 .dish-card { background: var(--card-bg); border-radius: 8px; padding: 1rem; cursor: pointer; border: 1px solid var(--border-color); }
+.dish-card p { font-weight: 600; color: var(--primary-color); margin-top: 0.3rem; }
 .cart-container { background: var(--card-bg); padding: 1rem; border-radius: 12px; }
 
 .dashboard-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }

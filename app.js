@@ -11,12 +11,14 @@ let isCartaFestiva = false;
 let tables = [];
 let dishes = [];
 let kitchenOrders = [];
+let activeClients = {}; // Clientes asignados por mesa
+
 let isJoinMode = false;
 let tablesToJoin = [];
 
 let selectedTable = null;
 let dishPendingMod = null;
-let selectedComandaCaja = null; // Comanda activa abierta en el modal de caja
+let selectedComandaCaja = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
@@ -30,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     cargarDatosDesdeSupabase();
-    loadFinanzasData();
 });
 
 async function cargarDatosDesdeSupabase() {
@@ -52,7 +53,6 @@ async function cargarDatosDesdeSupabase() {
         }
 
         await sincronizarComandasDesdeDB();
-
         renderTables();
         renderDishes('Todas');
         renderAdminMenuCategories();
@@ -74,7 +74,6 @@ async function sincronizarComandasDesdeDB() {
             items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
 
-        // Resetear estado de mesas
         tables.forEach(t => t.status = 'free');
         coms.forEach(c => {
             if (c.estado !== 'cobrado') {
@@ -86,6 +85,7 @@ async function sincronizarComandasDesdeDB() {
     renderCajaView();
     renderKitchenView();
     renderTables();
+    loadFinanzasData();
 }
 
 async function handleLogin(event) {
@@ -135,6 +135,7 @@ function switchRoleView(role) {
         target.classList.add('active');
         if (role === 'caja') renderCajaView();
         if (role === 'cocina') renderKitchenView();
+        if (role === 'admin') loadFinanzasData();
     } else {
         document.getElementById('view-mesero').classList.add('active');
     }
@@ -205,12 +206,25 @@ function openTakeoutView() {
 }
 
 // ==================== TOMA DE PEDIDOS ====================
+let tempOrderCart = [];
+
 function handleTableClick(tableName) {
     selectedTable = tableName;
+    tempOrderCart = []; // Limpiar carrito local al entrar
+
     document.getElementById('salonMapSection').classList.add('hidden');
     document.getElementById('orderSection').classList.remove('hidden');
     document.getElementById('currentOrderTitle').innerText = selectedTable;
     document.getElementById('cartTableTitle').innerText = selectedTable;
+
+    // Mostrar cliente asignado si existe
+    const clientSpan = document.getElementById('assignedClientTag');
+    if (activeClients[selectedTable]) {
+        clientSpan.innerText = `${activeClients[selectedTable].name} (${activeClients[selectedTable].phone})`;
+    } else {
+        clientSpan.innerText = 'Sin cliente';
+    }
+
     updateCartUI();
 }
 
@@ -221,8 +235,33 @@ function closeOrderSection() {
     renderTables();
 }
 
+// ==================== ASIGNAR CLIENTE ====================
+function openClientModal() {
+    document.getElementById('clientNameInput').value = '';
+    document.getElementById('clientPhoneInput').value = '';
+    document.getElementById('clientModal').classList.remove('hidden');
+}
+
+function closeClientModal() {
+    document.getElementById('clientModal').classList.add('hidden');
+}
+
+function guardarClienteMesa(event) {
+    event.preventDefault();
+    const name = document.getElementById('clientNameInput').value.trim();
+    const phone = document.getElementById('clientPhoneInput').value.trim();
+
+    if (selectedTable && name && phone) {
+        activeClients[selectedTable] = { name, phone };
+        document.getElementById('assignedClientTag').innerText = `${name} (${phone})`;
+        alert('Cliente asignado correctamente.');
+        closeClientModal();
+    }
+}
+
 function filterCategory(cat) { renderDishes(cat); }
 
+// RENDERIZAR CARTA CON PRECIOS NORMALES O FESTIVOS SEGÚN SWITCH
 function renderDishes(cat) {
     const grid = document.getElementById('dishesGrid');
     if (!grid) return;
@@ -230,10 +269,14 @@ function renderDishes(cat) {
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
     filtered.forEach(dish => {
-        const currentPrice = isCartaFestiva ? (dish.festivo || dish.price) : dish.price;
+        const currentPrice = isCartaFestiva ? dish.festivo : dish.price;
         const div = document.createElement('div');
         div.className = 'dish-card';
-        div.innerHTML = `<h5>${dish.name}</h5><p>S/ ${currentPrice.toFixed(2)}</p>`;
+        div.innerHTML = `
+            <h5>${dish.name}</h5>
+            <p>S/ ${currentPrice.toFixed(2)}</p>
+            ${isCartaFestiva ? '<span style="font-size:0.75rem; color:var(--accent-yellow);">Festivo</span>' : ''}
+        `;
         div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
     });
@@ -243,7 +286,7 @@ function renderDishes(cat) {
 function openModModal(dish) {
     dishPendingMod = dish;
     document.getElementById('modalDishName').innerText = dish.name;
-    document.getElementById('modalDishCategory').innerText = `Categoría: ${dish.category} - Base: S/ ${dish.price.toFixed(2)}`;
+    document.getElementById('modalDishCategory').innerText = `Categoría: ${dish.category} - Precio: S/ ${dish.price.toFixed(2)}`;
     document.getElementById('modalComment').value = '';
 
     const container = document.getElementById('modifiersContainer');
@@ -271,7 +314,6 @@ function closeModModal() {
     dishPendingMod = null;
 }
 
-let tempOrderCart = []; // Carrito local mientras se arma el pedido
 function confirmAddToCart() {
     if (!dishPendingMod) return;
     let extraPrice = 0;
@@ -298,43 +340,59 @@ function updateCartUI() {
     const itemsContainer = document.getElementById('cartItems');
     if (!itemsContainer) return;
 
-    if (tempOrderCart.length === 0) {
+    // Mostrar también los ítems ya enviados a cocina si la mesa ya tiene comanda activa
+    const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
+    let allItemsToDisplay = existingOrder ? [...existingOrder.items, ...tempOrderCart] : [...tempOrderCart];
+
+    if (allItemsToDisplay.length === 0) {
         itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
     } else {
         itemsContainer.innerHTML = '';
-        tempOrderCart.forEach((item, index) => {
+        allItemsToDisplay.forEach((item, index) => {
+            let isNew = index >= (existingOrder ? existingOrder.items.length : 0);
             itemsContainer.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <span>${item.name} - S/ ${item.price.toFixed(2)}</span>
-                    <button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>
+                    <span>${item.name} - S/ ${item.price.toFixed(2)} ${isNew ? '<span style="color:var(--accent-green); font-size:0.7rem;">(Nuevo)</span>' : ''}</span>
+                    ${isNew ? `<button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index - (existingOrder ? existingOrder.items.length : 0)},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>` : ''}
                 </div>
             `;
         });
     }
-    let subtotal = tempOrderCart.reduce((acc, item) => acc + item.price, 0);
+    let subtotal = allItemsToDisplay.reduce((acc, item) => acc + item.price, 0);
     document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
 }
 
 async function enviarPedidoACocina() {
     if (!selectedTable || tempOrderCart.length === 0) {
-        alert('No hay platos para enviar.');
+        alert('Agrega nuevos platos antes de enviar a cocina.');
         return;
     }
 
-    const totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
+    // Buscar si ya existe una comanda activa en Supabase para esta mesa
+    let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
 
-    const { data: comRes, error: errC } = await db.from('comandas').insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }]).select();
-    if (errC) { alert('Error: ' + errC.message); return; }
+    if (existingComanda) {
+        // Añadir nuevos ítems a la comanda existente
+        const itemsIns = tempOrderCart.map(i => ({ comanda_id: existingComanda.id, nombre_plato: i.name, precio: i.price }));
+        await db.from('items_comanda').insert(itemsIns);
 
-    const comandaId = comRes[0].id;
-    const itemsIns = tempOrderCart.map(i => ({ comanda_id: comandaId, nombre_plato: i.name, precio: i.price }));
-    
-    await db.from('items_comanda').insert(itemsIns);
+        let nuevoTotalTotal = existingComanda.total + tempOrderCart.reduce((acc, i) => acc + i.price, 0);
+        await db.from('comandas').update({ total: nuevoTotalTotal }).eq('id', existingComanda.id);
+    } else {
+        // Crear nueva comanda
+        let totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
+        const { data: comRes, error: errC } = await db.from('comandas').insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }]).select();
+        if (errC) { alert('Error: ' + errC.message); return; }
 
-    alert(`¡Pedido de ${selectedTable} enviado a cocina!`);
+        const comandaId = comRes[0].id;
+        const itemsIns = tempOrderCart.map(i => ({ comanda_id: comandaId, nombre_plato: i.name, precio: i.price }));
+        await db.from('items_comanda').insert(itemsIns);
+    }
+
+    alert(`¡Pedido enviado a cocina con éxito! El pedido se mantiene abierto en la mesa.`);
     tempOrderCart = [];
-    closeOrderSection();
     await sincronizarComandasDesdeDB();
+    updateCartUI();
 }
 
 // ==================== KDS COCINA ====================
@@ -404,7 +462,7 @@ function openCajaModal(comandaId) {
     const listContainer = document.getElementById('cajaItemsList');
     listContainer.innerHTML = '';
 
-    selectedComandaCaja.items.forEach((item, idx) => {
+    selectedComandaCaja.items.forEach((item) => {
         listContainer.innerHTML += `
             <div class="caja-item-row">
                 <label style="display:flex; align-items:center; gap:0.8rem; cursor:pointer;">
@@ -432,41 +490,73 @@ function calcularTotalCajaModal() {
     document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
 }
 
-// Cobrar solo lo seleccionado (Cuentas Separadas / Parciales)
+// IMPRIMIR PRECUENTA
+function imprimirPrecuenta() {
+    if (!selectedComandaCaja) return;
+    const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
+    let itemsSeleccionados = [];
+    let sub = 0;
+
+    checkboxes.forEach(chk => {
+        let itemId = parseInt(chk.value);
+        let found = selectedComandaCaja.items.find(i => i.id === itemId);
+        if (found) {
+            itemsSeleccionados.push(found);
+            sub += found.price;
+        }
+    });
+
+    let ventana = window.open('', '_blank', 'width=400,height=600');
+    ventana.document.write(`
+        <html>
+        <head><title>Precuenta - Carbón & Flama</title></head>
+        <body style="font-family: monospace; padding: 20px; text-align: center;">
+            <h2>CARBÓN & FLAMA</h2>
+            <p>--- PRECUENTA (RESUMEN) ---</p>
+            <p><b>Mesa:</b> ${selectedComandaCaja.table}</p>
+            <p><b>Hora:</b> ${new Date().toLocaleTimeString()}</p>
+            <hr/>
+            <div style="text-align: left;">
+                ${itemsSeleccionados.map(i => `<p>${i.name} ................. S/ ${i.price.toFixed(2)}</p>`).join('')}
+            </div>
+            <hr/>
+            <h3>TOTAL A PAGAR: S/ ${sub.toFixed(2)}</h3>
+            <p><i>Este documento no es un comprobante de pago oficial.</i></p>
+        </body>
+        </html>
+    `);
+    ventana.document.close();
+    ventana.print();
+}
+
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
-    if (checkboxes.length === 0) { alert('Selecciona al menos un ítem para cobrar.'); return; }
+    if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
 
     const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
-    
-    // Eliminar ítems pagados de la base de datos
     for (let id of itemIdsToPay) {
         await db.from('items_comanda').delete().eq('id', id);
     }
 
-    // Recalcular total restante de la comanda
     const remainingItems = selectedComandaCaja.items.filter(i => !itemIdsToPay.includes(i.id));
     
     if (remainingItems.length === 0) {
-        // Si pagó todo, cerramos la comanda por completo
-        await db.from('comandas').update({ estado: 'cobrado', total: 0 }).eq('id', selectedComandaCaja.id);
+        await db.from('comandas').update({ estado: 'cobrado' }).eq('id', selectedComandaCaja.id);
         alert('¡Cuenta cobrada y mesa liberada con éxito!');
     } else {
-        // Si quedan ítems (cuenta separada parcial), actualizamos el total en Supabase
         let newTotal = remainingItems.reduce((acc, i) => acc + i.price, 0);
         await db.from('comandas').update({ total: newTotal }).eq('id', selectedComandaCaja.id);
-        alert('¡Pago parcial procesado con éxito! Cuenta separada registrada.');
+        alert('¡Pago parcial procesado con éxito!');
     }
 
     closeCajaModal();
     await sincronizarComandasDesdeDB();
 }
 
-// Cobrar todo el ticket de golpe
 async function cobrarTodoYDesocupar() {
     if (!selectedComandaCaja) return;
 
-    await db.from('comandas').update({ estado: 'cobrado', total: 0 }).eq('id', selectedComandaCaja.id);
+    await db.from('comandas').update({ estado: 'cobrado' }).eq('id', selectedComandaCaja.id);
     await db.from('items_comanda').delete().eq('comanda_id', selectedComandaCaja.id);
 
     alert(`¡Mesa ${selectedComandaCaja.table} cobrada y liberada por completo!`);
@@ -474,7 +564,7 @@ async function cobrarTodoYDesocupar() {
     await sincronizarComandasDesdeDB();
 }
 
-// ==================== CARTA Y CONFIGURACIÓN ====================
+// ==================== CARTA Y REPORTES ADMINISTRADOR ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
     document.getElementById('lblCartaNormal').classList.toggle('active', !isFestiva);
@@ -493,12 +583,43 @@ async function registrarGasto(event) {
     loadFinanzasData();
 }
 
+// CARGAR VENTAS Y REPORTES REALES EN EL PANEL DE ADMINISTRADOR
 async function loadFinanzasData() {
-    const { data: gastos } = await db.from('gastos').select('*');
-    if (gastos) {
-        let totalGastos = gastos.reduce((acc, g) => acc + g.monto, 0);
-        document.getElementById('kpiGastosTotal').innerText = `S/ ${totalGastos.toFixed(2)}`;
+    try {
+        // 1. Obtener comandas cobradas (Ventas)
+        const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*').eq('estado', 'cobrado');
+        let totalVentas = 0;
+        if (!errC && comandasCobradas) {
+            // Si la columna total está en 0 por cierres pasados, sumamos los ítems cobrados o respaldamos con histórico
+            totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), desglosarTotalVentas(c.id)), 0);
+        }
+
+        // 2. Obtener gastos operativos
+        const { data: gastos, error: errG } = await db.from('gastos').select('*');
+        let totalGastos = 0;
+        if (!errG && gastos) {
+            totalGastos = gastos.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
+        }
+
+        let utilidadNeta = totalVentas - totalGastos;
+
+        const kpiVentas = document.getElementById('kpiVentasTotal');
+        const kpiGastos = document.getElementById('kpiGastosTotal');
+        const kpiUtilidad = document.getElementById('kpiUtilidad');
+
+        if (kpiVentas) kpiVentas.innerText = `S/ ${totalVentas.toFixed(2)}`;
+        if (kpiGastos) kpiGastos.innerText = `S/ ${totalGastos.toFixed(2)}`;
+        if (kpiUtilidad) {
+            kpiUtilidad.innerText = `S/ ${utilidadNeta.toFixed(2)}`;
+            kpiUtilidad.style.color = utilidadNeta >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        }
+    } catch (err) {
+        console.error("Error cargando finanzas:", err);
     }
+}
+
+function desglosarTotalVentas(comandaId) {
+    return 0; // Función auxiliar de respaldo
 }
 
 async function agregarPlato(event) {

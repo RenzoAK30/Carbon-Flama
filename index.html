@@ -33,7 +33,7 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL DE MODIFICADORES (MESERO) ==================== -->
+    <!-- ==================== MODAL MODIFICADORES (MESERO) ==================== -->
     <div id="modModal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3 id="modalDishName">Personalizar Plato</h3>
@@ -50,26 +50,47 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL DE DETALLE Y COBRO (CAJA & CUENTAS SEPARADAS) ==================== -->
+    <!-- ==================== MODAL ASIGNAR CLIENTE ==================== -->
+    <div id="clientModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Asignar Cliente</h3>
+            <p class="text-muted">Ingresa los datos del cliente para fidelización o pedidos.</p>
+            <form id="formCliente" onsubmit="guardarClienteMesa(event)">
+                <div class="form-group">
+                    <label>Nombre del Cliente</label>
+                    <input type="text" id="clientNameInput" placeholder="Nombre completo" required />
+                </div>
+                <div class="form-group">
+                    <label>Teléfono / DNI</label>
+                    <input type="text" id="clientPhoneInput" placeholder="Número de contacto" required />
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeClientModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL DE DETALLE Y COBRO (CAJA) ==================== -->
     <div id="cajaModal" class="modal-overlay hidden">
         <div class="modal-card modal-large">
             <div class="order-nav-header" style="margin-bottom:1rem;">
                 <h3 id="cajaModalTitle">Detalle de Consumo - Mesa</h3>
                 <button class="btn-secondary btn-sm" onclick="closeCajaModal()">✕ Cerrar</button>
             </div>
-            <p class="text-muted">Selecciona los ítems a cobrar (para cuentas separadas) o procesa el pago total.</p>
+            <p class="text-muted">Selecciona los ítems a cobrar (cuentas separadas) o emite una precuenta.</p>
             
-            <div id="cajaItemsList" class="caja-detalle-items">
-                <!-- Se cargan los platos dinámicamente -->
-            </div>
+            <div id="cajaItemsList" class="caja-detalle-items"></div>
 
             <div class="cart-summary mt-3">
                 <div class="summary-row total">
-                    <span>Monto Seleccionado / Total:</span>
+                    <span>Total Seleccionado:</span>
                     <span id="cajaModalTotal">S/ 0.00</span>
                 </div>
-                <div class="modal-actions mt-3">
-                    <button class="btn btn-secondary" onclick="cobrarSeleccionados()">💳 Cobrar Selección Parcial</button>
+                <div class="modal-actions mt-3 flex-wrap">
+                    <button class="btn btn-secondary" onclick="imprimirPrecuenta()">🖨️ Imprimir Precuenta</button>
+                    <button class="btn btn-primary" onclick="cobrarSeleccionados()">💳 Cobrar Selección Parcial</button>
                     <button class="btn btn-success" onclick="cobrarTodoYDesocupar()">✅ Cobrar Todo y Cerrar Mesa</button>
                 </div>
             </div>
@@ -108,7 +129,10 @@
                     <div class="order-nav-header">
                         <button class="btn-back" onclick="closeOrderSection()">← Volver</button>
                         <h2 id="currentOrderTitle">Mesa 1</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="alert('Cliente asignado')">+ Asignar cliente</button>
+                        <div>
+                            <span id="assignedClientTag" class="loyalty-tag mr-2">Sin cliente</span>
+                            <button class="btn btn-secondary btn-sm" onclick="openClientModal()">+ Asignar cliente</button>
+                        </div>
                     </div>
 
                     <div class="pos-layout">
@@ -134,7 +158,7 @@
                                     <span>Total:</span>
                                     <span id="cartTotal">S/ 0.00</span>
                                 </div>
-                                <button class="btn btn-success btn-block mt-3" onclick="enviarPedidoACocina()">🚀 Enviar y cerrar</button>
+                                <button class="btn btn-success btn-block mt-3" onclick="enviarPedidoACocina()">🚀 Enviar a Cocina</button>
                             </div>
                         </div>
                     </div>
