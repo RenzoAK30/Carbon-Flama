@@ -59,7 +59,7 @@ async function cargarDatosDesdeSupabase() {
                 name: p.nombre,
                 category: p.categoria,
                 price: parseFloat(p.precio),
-                festivo: parseFloat(p.festivo)
+                festivo: p.festivo !== null && p.festivo !== undefined ? parseFloat(p.festivo) : parseFloat(p.precio)
             }));
         }
 
@@ -329,13 +329,14 @@ function renderDishes(cat) {
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
     filtered.forEach(dish => {
+        // Selecciona el precio normal o festivo basado en el switch de administrador
         const currentPrice = isCartaFestiva ? dish.festivo : dish.price;
         const div = document.createElement('div');
         div.className = 'dish-card';
         div.innerHTML = `
             <h5>${dish.name}</h5>
             <p>S/ ${currentPrice.toFixed(2)}</p>
-            ${isCartaFestiva ? '<span style="font-size:0.7rem; color:var(--accent-yellow);">Festivo</span>' : ''}
+            ${isCartaFestiva ? '<span style="font-size:0.7rem; color:var(--accent-yellow);">Festivo</span>' : '<span style="font-size:0.7rem; color:var(--text-muted);">Normal</span>'}
         `;
         div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
@@ -627,7 +628,6 @@ function imprimirPrecuenta() {
     setTimeout(() => { ventana.print(); }, 300);
 }
 
-// ACTUALIZACIÓN DE CONSUMO TOTAL Y COBRO
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
     if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
@@ -686,11 +686,24 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
     }
 }
 
-// ==================== REPORTES Y ADMINISTRADOR ====================
+// ==================== CARTA Y REPORTES ADMINISTRADOR ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
+    
+    // Sincronizar el checkbox visualmente si se cambia desde otra parte
+    const chk = document.getElementById('chkFestiva');
+    if (chk) chk.checked = isFestiva;
+
     document.getElementById('lblCartaNormal').classList.toggle('active', !isFestiva);
     document.getElementById('lblCartaFestiva').classList.toggle('active', isFestiva);
+
+    // Actualizar badge visual en la vista mesero
+    const badge = document.getElementById('meseroCartaBadge');
+    if (badge) {
+        badge.innerText = isFestiva ? "🎉 Carta Festiva Activa" : "📋 Carta Normal Activa";
+        badge.style.color = isFestiva ? "var(--accent-yellow)" : "var(--accent-green)";
+    }
+
     renderDishes('Todas');
 }
 
@@ -736,7 +749,6 @@ async function loadFinanzasData() {
     }
 }
 
-// FILTRAR REPORTES DE VENTAS POR DÍA O RANGO DE FECHAS
 async function filtrarReportesPorFecha() {
     const fechaInicio = document.getElementById('reporteFechaInicio').value;
     const fechaFin = document.getElementById('reporteFechaFin').value;
@@ -750,7 +762,6 @@ async function filtrarReportesPorFecha() {
     try {
         let query = db.from('comandas').select('*').eq('estado', 'cobrado');
         
-        // Ajustar fechas para cubrir todo el día seleccionado
         let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
         let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
 
@@ -773,7 +784,6 @@ async function filtrarReportesPorFecha() {
     }
 }
 
-// BUSCAR HISTORIAL DE CONSUMOS DE UN CLIENTE POR DNI
 async function buscarHistorialCliente() {
     const dni = document.getElementById('inputBuscarClienteDni').value.trim();
     const contenedor = document.getElementById('resultadoClienteConsumos');
@@ -793,11 +803,8 @@ async function buscarHistorialCliente() {
         const { data: comandasCliente, error: errCom } = await db.from('comandas').select('*, items_comanda(*)').eq('cliente_dni', dni);
 
         let historialHtml = '';
-        let totalConsumidoHistorico = 0;
-
         if (comandasCliente && comandasCliente.length > 0) {
             comandasCliente.forEach(c => {
-                totalConsumidoHistorico += parseFloat(c.total);
                 let itemsStr = c.items_comanda.map(i => `${i.nombre_plato} (S/ ${i.precio})`).join(', ');
                 historialHtml += `
                     <div style="background:#1e1e24; padding:0.6rem; border-radius:6px; margin-bottom:0.5rem; font-size:0.85rem;">
@@ -867,7 +874,7 @@ async function agregarPlato(event) {
     if (error) { alert('Error: ' + error.message); } else {
         alert('Plato agregado');
         document.getElementById('formPlato').reset();
-        cargarDatosDasdeSupabase();
+        cargarDatosDesdeSupabase();
     }
 }
 

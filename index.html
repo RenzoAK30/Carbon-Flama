@@ -142,6 +142,8 @@
 
                     <div class="pos-layout">
                         <div class="menu-container">
+                            <!-- Indicador visual en la vista del mesero para saber si está en carta festiva -->
+                            <div id="meseroCartaBadge" class="mb-2" style="font-size:0.85rem; font-weight:600; color:var(--accent-green);">Carta Normal Activa</div>
                             <div class="categories-bar" id="categoriesBar">
                                 <button class="cat-btn active" onclick="filterCategory('Todas')">Todas</button>
                                 <button class="cat-btn" onclick="filterCategory('Parrillas')">Parrillas</button>
@@ -219,7 +221,6 @@
                         <div class="kpi-card success"><h4>Utilidad Neta</h4><p id="kpiUtilidad">S/ 0.00</p></div>
                     </div>
 
-                    <!-- Filtro por Rango de Fechas para Reportes -->
                     <div class="form-card">
                         <h3>Filtrar Reporte de Ventas</h3>
                         <div class="form-row">
@@ -253,7 +254,7 @@
 
                 <div id="adminTab-menu" class="admin-tab-pane">
                     <div class="form-card carta-config-card">
-                        <div class="carta-config-info"><h3>Carta activa</h3><p class="text-muted">Cambia entre precios normales y festivos</p></div>
+                        <div class="carta-config-info"><h3>Carta activa</h3><p class="text-muted">Cambia entre precios normales y festivos en tiempo real</p></div>
                         <div class="carta-toggle-container">
                             <span id="lblCartaNormal" class="toggle-label active">NORMAL</span>
                             <label class="switch"><input type="checkbox" id="chkFestiva" onchange="toggleCartaFestiva(this.checked)"><span class="slider round"></span></label>
@@ -275,7 +276,6 @@
                     <div id="adminMenuCategoriesContainer"></div>
                 </div>
 
-                <!-- Búsqueda de Consumos por Cliente -->
                 <div id="adminTab-clientes" class="admin-tab-pane">
                     <div class="form-card">
                         <h3>Buscar Historial de Consumos por Cliente</h3>
