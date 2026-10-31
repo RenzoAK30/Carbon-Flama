@@ -205,7 +205,7 @@
                 <div class="admin-tabs-bar">
                     <button class="admin-tab-btn active" onclick="switchAdminTab('reportes', event)">Reportes</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('menu', event)">Menú</button>
-                    <button class="admin-tab-btn" onclick="switchAdminTab('clientes', event)">Clientes</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('clientes', event)">Clientes & Consumos</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('recompensas', event)">Recompensas</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('mesas', event)">Mesas</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('usuarios', event)">Usuarios</button>
@@ -218,6 +218,26 @@
                         <div class="kpi-card danger"><h4>Gastos Operativos</h4><p id="kpiGastosTotal">S/ 0.00</p></div>
                         <div class="kpi-card success"><h4>Utilidad Neta</h4><p id="kpiUtilidad">S/ 0.00</p></div>
                     </div>
+
+                    <!-- Filtro por Rango de Fechas para Reportes -->
+                    <div class="form-card">
+                        <h3>Filtrar Reporte de Ventas</h3>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label>Desde:</label>
+                                <input type="date" id="reporteFechaInicio" />
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Hasta:</label>
+                                <input type="date" id="reporteFechaFin" />
+                            </div>
+                            <div style="display:flex; align-items:flex-end;">
+                                <button class="btn btn-primary" onclick="filtrarReportesPorFecha()">Filtrar Reporte</button>
+                            </div>
+                        </div>
+                        <div id="reporteFiltradoResultado" class="mt-3"></div>
+                    </div>
+
                     <div class="form-card">
                         <h3>Registrar Gasto del Local</h3>
                         <form id="formGasto" onsubmit="registrarGasto(event)">
@@ -255,7 +275,23 @@
                     <div id="adminMenuCategoriesContainer"></div>
                 </div>
 
-                <div id="adminTab-clientes" class="admin-tab-pane"><div class="form-card"><h3>Clientes</h3><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>DNI</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="3">Sin registros.</td></tr></tbody></table></div></div></div>
+                <!-- Búsqueda de Consumos por Cliente -->
+                <div id="adminTab-clientes" class="admin-tab-pane">
+                    <div class="form-card">
+                        <h3>Buscar Historial de Consumos por Cliente</h3>
+                        <div class="form-row">
+                            <input type="text" id="inputBuscarClienteDni" placeholder="Ingrese DNI del cliente..." maxlength="8" />
+                            <button class="btn btn-primary" onclick="buscarHistorialCliente()">Buscar Cliente</button>
+                        </div>
+                        <div id="resultadoClienteConsumos" class="mt-3"></div>
+                    </div>
+
+                    <div class="form-card">
+                        <h3>Listado General de Clientes</h3>
+                        <div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>DNI</th><th>Nombre</th><th>Teléfono</th><th>Consumo Total</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="4">Sin registros.</td></tr></tbody></table></div>
+                    </div>
+                </div>
+
                 <div id="adminTab-recompensas" class="admin-tab-pane"><div class="form-card"><h3>Recompensas</h3></div></div>
                 <div id="adminTab-mesas" class="admin-tab-pane">
                     <div class="form-card">

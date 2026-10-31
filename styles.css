@@ -27,12 +27,10 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .role-view { display: none; }
 .role-view.active { display: block; }
 
-/* Input con búsqueda / Lupa */
 .input-with-action { display: flex; gap: 0.5rem; }
 .input-with-action input { flex: 1; }
 .input-with-action button { padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: center; }
 
-/* KDS Cocina Columnas Verticales Adaptables */
 .kds-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.5rem; }
 .kds-column { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column; min-height: 400px; overflow: hidden; }
 .kds-column-header { padding: 0.9rem; font-weight: 600; text-align: center; color: #fff; font-size: 0.95rem; }
@@ -44,12 +42,10 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .kds-ticket h5 { margin-bottom: 0.4rem; color: #fff; }
 .kds-ticket p { font-size: 0.85rem; color: #a0a0a0; margin-bottom: 0.8rem; }
 
-/* Navegación Pedidos */
 .order-nav-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.8rem; }
 .btn-back { background: var(--card-bg); border: 1px solid var(--border-color); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .btn-back:hover { background: var(--border-color); }
 
-/* Modales Responsivos */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem; }
 .modal-card { background: var(--card-bg); padding: 1.8rem; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
 .modal-large { max-width: 550px; }
@@ -64,7 +60,6 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .text-center { text-align: center; }
 .loyalty-tag { background: #3d405b; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem; color: #fff; }
 
-/* Vista Caja y Detalle de Cuentas Separadas */
 .caja-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
 .caja-kpi-group { display: flex; gap: 0.8rem; flex-wrap: wrap; }
 .caja-kpi-pill { background: var(--card-bg); border: 1px solid var(--border-color); padding: 0.6rem 1rem; border-radius: 10px; display: flex; flex-direction: column; align-items: center; min-width: 100px; flex: 1; }
@@ -80,7 +75,6 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 .caja-detalle-items { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
 .caja-item-row { display: flex; justify-content: space-between; align-items: center; background: #1e1e24; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.9rem; }
 
-/* Switch Deslizable Carta Activa */
 .carta-config-card { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
 .carta-toggle-container { display: flex; align-items: center; gap: 1rem; }
 .toggle-label { font-weight: 600; font-size: 0.9rem; color: #a0a0a0; }
@@ -92,7 +86,6 @@ body { background-color: var(--bg-dark); color: var(--text-color); }
 input:checked + .slider { background-color: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(24px); }
 
-/* Administración Menú */
 .admin-category-section { background: var(--card-bg); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem; border: 1px solid var(--border-color); }
 .admin-category-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
 .menu-item-row { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
@@ -100,7 +93,6 @@ input:checked + .slider:before { transform: translateX(24px); }
 .menu-item-prices { font-weight: 600; color: var(--primary-color); }
 .menu-item-fest { font-size: 0.75rem; color: #a0a0a0; font-weight: 400; }
 
-/* Tabs Administrador */
 .admin-tabs-bar { display: flex; gap: 0.5rem; background: #111217; padding: 0.5rem; border-radius: 8px; margin: 1.2rem 0; overflow-x: auto; white-space: nowrap; }
 .admin-tab-btn { background: transparent; border: none; color: var(--text-color); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; }
 .admin-tab-btn.active { background: var(--primary-color); color: #fff; }
@@ -120,7 +112,6 @@ input:checked + .slider:before { transform: translateX(24px); }
 .table-card.occupied { border-color: var(--accent-red); }
 .table-card.selected-join { border-color: var(--accent-yellow) !important; background: rgba(241, 196, 15, 0.1); }
 
-/* Layout de Toma de Pedidos */
 .pos-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.2rem; margin-top: 1rem; }
 .categories-bar { display: flex; gap: 0.5rem; overflow-x: auto; white-space: nowrap; padding-bottom: 0.5rem; }
 .cat-btn { background: var(--card-bg); border: 1px solid var(--border-color); color: #fff; padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }

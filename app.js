@@ -32,7 +32,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     cargarDatosDesdeSupabase();
+    configurarSupabaseRealtime();
 });
+
+// ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA) ====================
+function configurarSupabaseRealtime() {
+    db.channel('public-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
+          console.log('Cambio detectado en tiempo real:', payload);
+          sincronizarComandasDesdeDB();
+      })
+      .subscribe();
+}
 
 async function cargarDatosDesdeSupabase() {
     try {
@@ -73,6 +84,7 @@ async function sincronizarComandasDesdeDB() {
             total: parseFloat(c.total),
             cliente_dni: c.cliente_dni,
             time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            created_at: c.created_at,
             items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
 
@@ -88,6 +100,7 @@ async function sincronizarComandasDesdeDB() {
     renderKitchenView();
     renderTables();
     loadFinanzasData();
+    cargarClientesAdmin();
 }
 
 async function handleLogin(event) {
@@ -290,7 +303,6 @@ async function guardarClienteMesa(event) {
 
     if (selectedTable && dni && name && phone) {
         try {
-            // Aseguramos que el cliente exista en la base de datos antes de asignarlo a la mesa
             const { error } = await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
             if (error) {
                 alert('Error al guardar cliente en BD: ' + error.message);
@@ -546,7 +558,7 @@ function calcularTotalCajaModal() {
     document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
 }
 
-// IMPRESIÓN DE PRECUENTA - TAMAÑO TICKETERA TÉRMICA 80mm
+// IMPRESIÓN DE PRECUENTA - TICKETERA TÉRMICA 80mm
 function imprimirPrecuenta() {
     if (!selectedComandaCaja) return;
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
@@ -580,7 +592,6 @@ function imprimirPrecuenta() {
                 .text-center { text-align: center; }
                 .bold { font-weight: bold; }
                 hr { border: dashed 1px #000; margin: 5px 0; }
-                .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
             </style>
         </head>
         <body>
@@ -613,22 +624,27 @@ function imprimirPrecuenta() {
         </html>
     `);
     ventana.document.close();
-    setTimeout(() => {
-        ventana.print();
-    }, 300);
+    setTimeout(() => { ventana.print(); }, 300);
 }
 
+// ACTUALIZACIÓN DE CONSUMO TOTAL Y COBRO
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
     if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
 
     const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
+    let montoPagadoParcial = Array.from(checkboxes).reduce((acc, chk) => acc + parseFloat(chk.dataset.price), 0);
+
     for (let id of itemIdsToPay) {
         await db.from('items_comanda').delete().eq('id', id);
     }
 
     const remainingItems = selectedComandaCaja.items.filter(i => !itemIdsToPay.includes(i.id));
     
+    if (selectedComandaCaja.cliente_dni) {
+        await actualizarConsumoCliente(selectedComandaCaja.cliente_dni, montoPagadoParcial);
+    }
+
     if (remainingItems.length === 0) {
         await db.from('comandas').update({ estado: 'cobrado' }).eq('id', selectedComandaCaja.id);
         alert('¡Cuenta cobrada y mesa liberada con éxito!');
@@ -645,6 +661,11 @@ async function cobrarSeleccionados() {
 async function cobrarTodoYDesocupar() {
     if (!selectedComandaCaja) return;
 
+    let montoTotalComanda = selectedComandaCaja.total;
+    if (selectedComandaCaja.cliente_dni) {
+        await actualizarConsumoCliente(selectedComandaCaja.cliente_dni, montoTotalComanda);
+    }
+
     await db.from('comandas').update({ estado: 'cobrado' }).eq('id', selectedComandaCaja.id);
     await db.from('items_comanda').delete().eq('comanda_id', selectedComandaCaja.id);
 
@@ -653,7 +674,19 @@ async function cobrarTodoYDesocupar() {
     await sincronizarComandasDesdeDB();
 }
 
-// ==================== CARTA Y REPORTES ADMINISTRADOR ====================
+async function actualizarConsumoCliente(dni, montoAdicional) {
+    try {
+        const { data: cliente, error } = await db.from('clientes').select('consumo_total').eq('dni', dni).single();
+        if (!error && cliente) {
+            let nuevoTotal = (parseFloat(cliente.consumo_total) || 0) + parseFloat(montoAdicional);
+            await db.from('clientes').update({ consumo_total: nuevoTotal }).eq('dni', dni);
+        }
+    } catch (e) {
+        console.error("Error actualizando consumo del cliente:", e);
+    }
+}
+
+// ==================== REPORTES Y ADMINISTRADOR ====================
 function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
     document.getElementById('lblCartaNormal').classList.toggle('active', !isFestiva);
@@ -703,6 +736,98 @@ async function loadFinanzasData() {
     }
 }
 
+// FILTRAR REPORTES DE VENTAS POR DÍA O RANGO DE FECHAS
+async function filtrarReportesPorFecha() {
+    const fechaInicio = document.getElementById('reporteFechaInicio').value;
+    const fechaFin = document.getElementById('reporteFechaFin').value;
+    const resultadoDiv = document.getElementById('reporteFiltradoResultado');
+
+    if (!fechaInicio || !fechaFin) {
+        alert('Por favor selecciona una fecha de inicio y fin.');
+        return;
+    }
+
+    try {
+        let query = db.from('comandas').select('*').eq('estado', 'cobrado');
+        
+        // Ajustar fechas para cubrir todo el día seleccionado
+        let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
+        let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
+
+        query = query.gte('created_at', inicioIso).lte('created_at', finIso);
+
+        const { data, error } = await query;
+        if (error) { resultadoDiv.innerHTML = `<p style="color:var(--accent-red);">Error al filtrar: ${error.message}</p>`; return; }
+
+        let totalRango = data.reduce((acc, c) => acc + parseFloat(c.total), 0);
+
+        resultadoDiv.innerHTML = `
+            <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:0.8rem; border:1px solid var(--border-color);">
+                <p><b>Período:</b> ${fechaInicio} al ${fechaFin}</p>
+                <p><b>Comandas cobradas:</b> ${data.length}</p>
+                <h4 style="color:var(--accent-green); margin-top:0.5rem;">Total Vendido: S/ ${totalRango.toFixed(2)}</h4>
+            </div>
+        `;
+    } catch (e) {
+        console.error("Error en reporte por fecha:", e);
+    }
+}
+
+// BUSCAR HISTORIAL DE CONSUMOS DE UN CLIENTE POR DNI
+async function buscarHistorialCliente() {
+    const dni = document.getElementById('inputBuscarClienteDni').value.trim();
+    const contenedor = document.getElementById('resultadoClienteConsumos');
+
+    if (!dni) {
+        alert('Ingresa el DNI del cliente a buscar.');
+        return;
+    }
+
+    try {
+        const { data: cliente, error: errCli } = await db.from('clientes').select('*').eq('dni', dni).single();
+        if (errCli || !cliente) {
+            contenedor.innerHTML = `<p style="color:var(--accent-red);">Cliente no encontrado con DNI ${dni}</p>`;
+            return;
+        }
+
+        const { data: comandasCliente, error: errCom } = await db.from('comandas').select('*, items_comanda(*)').eq('cliente_dni', dni);
+
+        let historialHtml = '';
+        let totalConsumidoHistorico = 0;
+
+        if (comandasCliente && comandasCliente.length > 0) {
+            comandasCliente.forEach(c => {
+                totalConsumidoHistorico += parseFloat(c.total);
+                let itemsStr = c.items_comanda.map(i => `${i.nombre_plato} (S/ ${i.precio})`).join(', ');
+                historialHtml += `
+                    <div style="background:#1e1e24; padding:0.6rem; border-radius:6px; margin-bottom:0.5rem; font-size:0.85rem;">
+                        <b>Mesa/Llevar:</b> ${c.mesa} | <b>Fecha:</b> ${new Date(c.created_at).toLocaleString()} | <b>Estado:</b> ${c.estado}<br>
+                        <b>Ítems:</b> ${itemsStr}<br>
+                        <strong style="color:var(--primary-color);">Total: S/ ${parseFloat(c.total).toFixed(2)}</strong>
+                    </div>
+                `;
+            });
+        } else {
+            historialHtml = `<p class="text-muted">No registra consumos previos en comandas.</p>`;
+        }
+
+        contenedor.innerHTML = `
+            <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:1rem; border:1px solid var(--border-color);">
+                <h4>Cliente: ${cliente.nombre}</h4>
+                <p><b>DNI:</b> ${cliente.dni} | <b>Teléfono:</b> ${cliente.telefono || 'N/A'}</p>
+                <p><b>Consumo Acumulado Registrado:</b> S/ ${(parseFloat(cliente.consumo_total) || 0).toFixed(2)}</p>
+                <hr style="margin: 0.8rem 0; border-color:var(--border-color);"/>
+                <h5>Historial de Comandas:</h5>
+                <div style="max-height: 250px; overflow-y: auto; margin-top: 0.5rem;">
+                    ${historialHtml}
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        console.error("Error buscando cliente:", e);
+    }
+}
+
 async function cargarClientesAdmin() {
     const tbody = document.getElementById('adminClientesTableBody');
     if (!tbody) return;
@@ -710,7 +835,7 @@ async function cargarClientesAdmin() {
     try {
         const { data: clientes, error } = await db.from('clientes').select('*');
         if (error || !clientes || clientes.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3">Sin registros de clientes.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4">Sin registros de clientes.</td></tr>`;
             return;
         }
 
@@ -721,6 +846,7 @@ async function cargarClientesAdmin() {
                     <td><b>${cli.dni}</b></td>
                     <td>${cli.nombre}</td>
                     <td>${cli.telefono || 'N/A'}</td>
+                    <td>S/ ${(parseFloat(cli.consumo_total) || 0).toFixed(2)}</td>
                 </tr>
             `;
         });
@@ -741,7 +867,7 @@ async function agregarPlato(event) {
     if (error) { alert('Error: ' + error.message); } else {
         alert('Plato agregado');
         document.getElementById('formPlato').reset();
-        cargarDatosDesdeSupabase();
+        cargarDatosDasdeSupabase();
     }
 }
 
@@ -791,7 +917,7 @@ async function agregarMesaSalon() {
 
 async function eliminarMesa(id) {
     await db.from('mesas').delete().eq('id', id);
-    cargarDatosDasdeSupabase();
+    cargarDatosDesdeSupabase();
 }
 
 async function crearUsuarioTrabajador(e) {
