@@ -289,17 +289,22 @@ async function guardarClienteMesa(event) {
     const phone = document.getElementById('clientPhoneInput').value.trim();
 
     if (selectedTable && dni && name && phone) {
-        activeClients[selectedTable] = { dni, name, phone };
-        document.getElementById('assignedClientTag').innerText = `${name} (DNI: ${dni})`;
-
         try {
-            await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
+            // Aseguramos que el cliente exista en la base de datos antes de asignarlo a la mesa
+            const { error } = await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
+            if (error) {
+                alert('Error al guardar cliente en BD: ' + error.message);
+                return;
+            }
+
+            activeClients[selectedTable] = { dni, name, phone };
+            document.getElementById('assignedClientTag').innerText = `${name} (DNI: ${dni})`;
+            alert('Cliente asignado y guardado correctamente.');
+            closeClientModal();
         } catch (e) {
             console.error("Error guardando cliente:", e);
+            alert('Ocurrió un error al registrar el cliente.');
         }
-
-        alert('Cliente asignado correctamente.');
-        closeClientModal();
     }
 }
 
@@ -541,6 +546,7 @@ function calcularTotalCajaModal() {
     document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
 }
 
+// IMPRESIÓN DE PRECUENTA - TAMAÑO TICKETERA TÉRMICA 80mm
 function imprimirPrecuenta() {
     if (!selectedComandaCaja) return;
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
@@ -556,28 +562,60 @@ function imprimirPrecuenta() {
         }
     });
 
-    let ventana = window.open('', '_blank', 'width=400,height=600');
+    let ventana = window.open('', '_blank', 'width=300,height=600');
     ventana.document.write(`
         <html>
-        <head><title>Precuenta - Carbón & Flama</title></head>
-        <body style="font-family: monospace; padding: 20px; text-align: center;">
-            <h2>CARBÓN & FLAMA</h2>
-            <p>--- PRECUENTA (RESUMEN) ---</p>
-            <p><b>Mesa:</b> ${selectedComandaCaja.table}</p>
-            ${selectedComandaCaja.cliente_dni ? `<p><b>DNI Cliente:</b> ${selectedComandaCaja.cliente_dni}</p>` : ''}
-            <p><b>Hora:</b> ${new Date().toLocaleTimeString()}</p>
+        <head>
+            <title>Precuenta - Carbón & Flama</title>
+            <style>
+                @page { size: 80mm auto; margin: 0; }
+                body {
+                    font-family: 'Courier New', Courier, monospace;
+                    width: 72mm;
+                    margin: 4mm auto;
+                    font-size: 12px;
+                    color: #000;
+                    text-align: left;
+                }
+                .text-center { text-align: center; }
+                .bold { font-weight: bold; }
+                hr { border: dashed 1px #000; margin: 5px 0; }
+                .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+            </style>
+        </head>
+        <body>
+            <div class="text-center bold" style="font-size: 14px;">CARBÓN & FLAMA</div>
+            <div class="text-center">RUC: 20000000001</div>
+            <div class="text-center">--- PRECUENTA ---</div>
+            <br>
+            <div><b>Mesa:</b> ${selectedComandaCaja.table}</div>
+            ${selectedComandaCaja.cliente_dni ? `<div><b>DNI Cliente:</b> ${selectedComandaCaja.cliente_dni}</div>` : ''}
+            <div><b>Fecha/Hora:</b> ${new Date().toLocaleString()}</div>
             <hr/>
-            <div style="text-align: left;">
-                ${itemsSeleccionados.map(i => `<p>${i.name} ................. S/ ${i.price.toFixed(2)}</p>`).join('')}
+            <div>
+                ${itemsSeleccionados.map(i => `
+                    <div style="margin-bottom: 4px;">
+                        <div>${i.name}</div>
+                        <div style="text-align: right; font-weight: bold;">S/ ${i.price.toFixed(2)}</div>
+                    </div>
+                `).join('')}
             </div>
             <hr/>
-            <h3>TOTAL A PAGAR: S/ ${sub.toFixed(2)}</h3>
-            <p><i>Este documento no es un comprobante de pago oficial.</i></p>
+            <div style="font-size: 14px; text-align: right;" class="bold">
+                TOTAL: S/ ${sub.toFixed(2)}
+            </div>
+            <hr/>
+            <div class="text-center" style="font-size: 10px; margin-top: 10px;">
+                ¡Gracias por su preferencia!<br>
+                Documento no válido como comprobante de pago.
+            </div>
         </body>
         </html>
     `);
     ventana.document.close();
-    ventana.print();
+    setTimeout(() => {
+        ventana.print();
+    }, 300);
 }
 
 async function cobrarSeleccionados() {
@@ -753,7 +791,7 @@ async function agregarMesaSalon() {
 
 async function eliminarMesa(id) {
     await db.from('mesas').delete().eq('id', id);
-    cargarDatosDesdeSupabase();
+    cargarDatosDasdeSupabase();
 }
 
 async function crearUsuarioTrabajador(e) {

@@ -52,12 +52,12 @@
     <div id="clientModal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3>Asignar Cliente</h3>
-            <p class="text-muted">Busca por DNI o ingresa los datos del cliente manualmente.</p>
+            <p class="text-muted">Busca por DNI o ingresa los datos del cliente.</p>
             <form id="formCliente" onsubmit="guardarClienteMesa(event)">
                 <div class="form-group">
                     <label>DNI</label>
                     <div class="input-with-action">
-                        <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" />
+                        <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" required />
                         <button type="button" class="btn btn-secondary" onclick="buscarClientePorDni()" title="Buscar en base de datos">🔍</button>
                     </div>
                 </div>
@@ -94,7 +94,7 @@
                     <span id="cajaModalTotal">S/ 0.00</span>
                 </div>
                 <div class="modal-actions mt-3 flex-wrap">
-                    <button class="btn btn-secondary" onclick="imprimirPrecuenta()">🖨️ Precuenta</button>
+                    <button class="btn btn-secondary" onclick="imprimirPrecuenta()">🖨️ Precuenta (80mm)</button>
                     <button class="btn btn-primary" onclick="cobrarSeleccionados()">💳 Pago Parcial</button>
                     <button class="btn btn-success" onclick="cobrarTodoYDesocupar()">✅ Cobrar Todo</button>
                 </div>
