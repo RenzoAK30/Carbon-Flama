@@ -57,6 +57,7 @@ async function cargarDatosDesdeSupabase() {
         renderDishes('Todas');
         renderAdminMenuCategories();
         renderAdminMesas();
+        cargarClientesAdmin();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
     }
@@ -70,6 +71,7 @@ async function sincronizarComandasDesdeDB() {
             table: c.mesa,
             status: c.estado,
             total: parseFloat(c.total),
+            cliente_dni: c.cliente_dni,
             time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
@@ -135,7 +137,10 @@ function switchRoleView(role) {
         target.classList.add('active');
         if (role === 'caja') renderCajaView();
         if (role === 'cocina') renderKitchenView();
-        if (role === 'admin') loadFinanzasData();
+        if (role === 'admin') {
+            loadFinanzasData();
+            cargarClientesAdmin();
+        }
     } else {
         document.getElementById('view-mesero').classList.add('active');
     }
@@ -146,6 +151,7 @@ function switchAdminTab(tabName, event) {
     document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
     if (event) event.currentTarget.classList.add('active');
     document.getElementById(`adminTab-${tabName}`).classList.add('active');
+    if (tabName === 'clientes') cargarClientesAdmin();
 }
 
 // ==================== MAPA DE MESAS ====================
@@ -219,7 +225,7 @@ function handleTableClick(tableName) {
 
     const clientSpan = document.getElementById('assignedClientTag');
     if (activeClients[selectedTable]) {
-        clientSpan.innerText = `${activeClients[selectedTable].name} (${activeClients[selectedTable].phone})`;
+        clientSpan.innerText = `${activeClients[selectedTable].name} (DNI: ${activeClients[selectedTable].dni})`;
     } else {
         clientSpan.innerText = 'Sin cliente';
     }
@@ -282,9 +288,9 @@ async function guardarClienteMesa(event) {
     const name = document.getElementById('clientNameInput').value.trim();
     const phone = document.getElementById('clientPhoneInput').value.trim();
 
-    if (selectedTable && name && phone) {
+    if (selectedTable && dni && name && phone) {
         activeClients[selectedTable] = { dni, name, phone };
-        document.getElementById('assignedClientTag').innerText = `${name} (${phone})`;
+        document.getElementById('assignedClientTag').innerText = `${name} (DNI: ${dni})`;
 
         try {
             await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
@@ -312,7 +318,7 @@ function renderDishes(cat) {
         div.innerHTML = `
             <h5>${dish.name}</h5>
             <p>S/ ${currentPrice.toFixed(2)}</p>
-            ${isCartaFestiva ? '<span style="font-size:0.75rem; color:var(--accent-yellow);">Festivo</span>' : ''}
+            ${isCartaFestiva ? '<span style="font-size:0.7rem; color:var(--accent-yellow);">Festivo</span>' : ''}
         `;
         div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
@@ -404,6 +410,9 @@ async function enviarPedidoACocina() {
         return;
     }
 
+    const clienteAsignado = activeClients[selectedTable];
+    const clienteDni = clienteAsignado ? clienteAsignado.dni : null;
+
     let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
 
     if (existingComanda) {
@@ -411,10 +420,19 @@ async function enviarPedidoACocina() {
         await db.from('items_comanda').insert(itemsIns);
 
         let nuevoTotalTotal = existingComanda.total + tempOrderCart.reduce((acc, i) => acc + i.price, 0);
-        await db.from('comandas').update({ total: nuevoTotalTotal }).eq('id', existingComanda.id);
+        let updateData = { total: nuevoTotalTotal };
+        if (clienteDni) updateData.cliente_dni = clienteDni;
+
+        await db.from('comandas').update(updateData).eq('id', existingComanda.id);
     } else {
         let totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
-        const { data: comRes, error: errC } = await db.from('comandas').insert([{ mesa: selectedTable, estado: 'pendiente', total: totalMonto }]).select();
+        const { data: comRes, error: errC } = await db.from('comandas').insert([{ 
+            mesa: selectedTable, 
+            estado: 'pendiente', 
+            total: totalMonto,
+            cliente_dni: clienteDni 
+        }]).select();
+
         if (errC) { alert('Error: ' + errC.message); return; }
 
         const comandaId = comRes[0].id;
@@ -422,7 +440,7 @@ async function enviarPedidoACocina() {
         await db.from('items_comanda').insert(itemsIns);
     }
 
-    alert(`¡Pedido enviado a cocina con éxito! El pedido se mantiene abierto en la mesa.`);
+    alert(`¡Pedido enviado a cocina con éxito!`);
     tempOrderCart = [];
     await sincronizarComandasDesdeDB();
     updateCartUI();
@@ -442,7 +460,7 @@ function renderKitchenView() {
         const cardHtml = `
             <div class="kds-ticket">
                 <h5>🍽️ ${ord.table}</h5>
-                <p>Hora: ${ord.time}</p>
+                <p>Hora: ${ord.time} ${ord.cliente_dni ? `| DNI: ${ord.cliente_dni}` : ''}</p>
                 <ul>${itemsHtml}</ul>
                 <div style="margin-top: 0.8rem; display:flex; gap:0.5rem;">
                     ${ord.status === 'pendiente' ? `<button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${ord.id}, 'preparando')">Preparar ➔</button>` : ''}
@@ -480,7 +498,7 @@ function renderCajaView() {
         grid.innerHTML += `
             <div class="caja-ticket-card" onclick="openCajaModal(${ticket.id})">
                 <div class="ticket-header"><span>🍽️ ${ticket.table}</span></div>
-                <div class="ticket-time">Abierta ${ticket.time} | Ítems: ${ticket.items.length}</div>
+                <div class="ticket-time">Abierta ${ticket.time} | Ítems: ${ticket.items.length} ${ticket.cliente_dni ? `<br><small>DNI: ${ticket.cliente_dni}</small>` : ''}</div>
                 <div class="ticket-price">S/ ${ticket.total.toFixed(2)}</div>
             </div>
         `;
@@ -546,6 +564,7 @@ function imprimirPrecuenta() {
             <h2>CARBÓN & FLAMA</h2>
             <p>--- PRECUENTA (RESUMEN) ---</p>
             <p><b>Mesa:</b> ${selectedComandaCaja.table}</p>
+            ${selectedComandaCaja.cliente_dni ? `<p><b>DNI Cliente:</b> ${selectedComandaCaja.cliente_dni}</p>` : ''}
             <p><b>Hora:</b> ${new Date().toLocaleTimeString()}</p>
             <hr/>
             <div style="text-align: left;">
@@ -643,6 +662,32 @@ async function loadFinanzasData() {
         }
     } catch (err) {
         console.error("Error cargando finanzas:", err);
+    }
+}
+
+async function cargarClientesAdmin() {
+    const tbody = document.getElementById('adminClientesTableBody');
+    if (!tbody) return;
+
+    try {
+        const { data: clientes, error } = await db.from('clientes').select('*');
+        if (error || !clientes || clientes.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3">Sin registros de clientes.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        clientes.forEach(cli => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><b>${cli.dni}</b></td>
+                    <td>${cli.nombre}</td>
+                    <td>${cli.telefono || 'N/A'}</td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error("Error cargando clientes:", err);
     }
 }
 

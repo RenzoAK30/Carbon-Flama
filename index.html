@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Carbón & Flama - POS & Gestión</title>
     <link rel="icon" type="image/x-icon" href="src/logo.ico">
     <link rel="stylesheet" href="styles.css">
@@ -94,9 +94,9 @@
                     <span id="cajaModalTotal">S/ 0.00</span>
                 </div>
                 <div class="modal-actions mt-3 flex-wrap">
-                    <button class="btn btn-secondary" onclick="imprimirPrecuenta()">🖨️ Imprimir Precuenta</button>
-                    <button class="btn btn-primary" onclick="cobrarSeleccionados()">💳 Cobrar Selección Parcial</button>
-                    <button class="btn btn-success" onclick="cobrarTodoYDesocupar()">✅ Cobrar Todo y Cerrar Mesa</button>
+                    <button class="btn btn-secondary" onclick="imprimirPrecuenta()">🖨️ Precuenta</button>
+                    <button class="btn btn-primary" onclick="cobrarSeleccionados()">💳 Pago Parcial</button>
+                    <button class="btn btn-success" onclick="cobrarTodoYDesocupar()">✅ Cobrar Todo</button>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@
             </div>
             <div class="user-info-bar">
                 <span id="loggedUserName">Usuario</span>
-                <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Cerrar Sesión</button>
+                <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Salir</button>
             </div>
         </header>
 
@@ -123,8 +123,8 @@
                     <div class="salon-header">
                         <h2>Mapa de Mesas</h2>
                         <div class="table-actions">
-                            <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">🔗 Modo Unir Mesas</button>
-                            <button class="btn btn-primary" onclick="openTakeoutView()">🛵 Para Llevar / Deliverys</button>
+                            <button class="btn btn-secondary" onclick="toggleJoinTablesMode()" id="btnJoinMode">🔗 Unir Mesas</button>
+                            <button class="btn btn-primary" onclick="openTakeoutView()">🛵 Para Llevar</button>
                         </div>
                     </div>
                     <div class="tables-grid" id="tablesGrid"></div>
@@ -134,9 +134,9 @@
                     <div class="order-nav-header">
                         <button class="btn-back" onclick="closeOrderSection()">← Volver</button>
                         <h2 id="currentOrderTitle">Mesa 1</h2>
-                        <div>
+                        <div class="order-client-action">
                             <span id="assignedClientTag" class="loyalty-tag mr-2">Sin cliente</span>
-                            <button class="btn btn-secondary btn-sm" onclick="openClientModal()">+ Asignar cliente</button>
+                            <button class="btn btn-secondary btn-sm" onclick="openClientModal()">+ Cliente</button>
                         </div>
                     </div>
 
@@ -255,7 +255,7 @@
                     <div id="adminMenuCategoriesContainer"></div>
                 </div>
 
-                <div id="adminTab-clientes" class="admin-tab-pane"><div class="form-card"><h3>Clientes</h3><table class="data-table"><thead><tr><th>Nombre</th><th>Teléfono</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="2">Sin registros.</td></tr></tbody></table></div></div>
+                <div id="adminTab-clientes" class="admin-tab-pane"><div class="form-card"><h3>Clientes</h3><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>DNI</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody id="adminClientesTableBody"><tr><td colspan="3">Sin registros.</td></tr></tbody></table></div></div></div>
                 <div id="adminTab-recompensas" class="admin-tab-pane"><div class="form-card"><h3>Recompensas</h3></div></div>
                 <div id="adminTab-mesas" class="admin-tab-pane">
                     <div class="form-card">
