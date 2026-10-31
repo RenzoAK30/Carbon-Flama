@@ -21,6 +21,14 @@ let dishPendingMod = null;
 let selectedComandaCaja = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Recuperar estado persistente del switch de carta festiva
+    const savedCarta = localStorage.getItem('cf_is_festiva');
+    if (savedCarta !== null) {
+        isCartaFestiva = savedCarta === 'true';
+        const chk = document.getElementById('chkFestiva');
+        if (chk) chk.checked = isCartaFestiva;
+    }
+
     const loggedUser = localStorage.getItem('cf_user');
     if (loggedUser) {
         try {
@@ -33,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarDatosDesdeSupabase();
     configurarSupabaseRealtime();
+    
+    // Aplicar estado inicial de la carta visualmente
+    toggleCartaFestiva(isCartaFestiva, false);
 });
 
 // ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA) ====================
@@ -329,7 +340,6 @@ function renderDishes(cat) {
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
     
     filtered.forEach(dish => {
-        // Selecciona el precio normal o festivo basado en el switch de administrador
         const currentPrice = isCartaFestiva ? dish.festivo : dish.price;
         const div = document.createElement('div');
         div.className = 'dish-card';
@@ -687,17 +697,22 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
 }
 
 // ==================== CARTA Y REPORTES ADMINISTRADOR ====================
-function toggleCartaFestiva(isFestiva) {
+function toggleCartaFestiva(isFestiva, guardarEnStorage = true) {
     isCartaFestiva = isFestiva;
     
-    // Sincronizar el checkbox visualmente si se cambia desde otra parte
+    // Guardar en localStorage para que persista al actualizar la página
+    if (guardarEnStorage) {
+        localStorage.setItem('cf_is_festiva', isFestiva);
+    }
+    
     const chk = document.getElementById('chkFestiva');
     if (chk) chk.checked = isFestiva;
 
-    document.getElementById('lblCartaNormal').classList.toggle('active', !isFestiva);
-    document.getElementById('lblCartaFestiva').classList.toggle('active', isFestiva);
+    const lblNormal = document.getElementById('lblCartaNormal');
+    const lblFestiva = document.getElementById('lblCartaFestiva');
+    if (lblNormal) lblNormal.classList.toggle('active', !isFestiva);
+    if (lblFestiva) lblFestiva.classList.toggle('active', isFestiva);
 
-    // Actualizar badge visual en la vista mesero
     const badge = document.getElementById('meseroCartaBadge');
     if (badge) {
         badge.innerText = isFestiva ? "🎉 Carta Festiva Activa" : "📋 Carta Normal Activa";
