@@ -8,6 +8,7 @@ const db = window.supabaseClient;
 let currentUserProfile = null;
 let currentRole = 'mesero';
 let isCartaFestiva = false;
+let isFestiva = false; // Declarada correctamente para evitar ReferenceError
 
 let tables = [];
 let dishes = [];
@@ -43,6 +44,7 @@ function configurarSupabaseRealtime() {
           console.log('Cambio detectado en tiempo real:', payload);
           if (payload.table === 'configuracion') {
               isCartaFestiva = payload.new.carta_festiva;
+              isFestiva = isCartaFestiva;
               const chk = document.getElementById('chkFestiva');
               if (chk) chk.checked = isCartaFestiva;
               actualizarInterfazCartaVisual();
@@ -59,18 +61,23 @@ async function cargarDatosDesdeSupabase() {
         const { data: configData, error: errConfig } = await db.from('configuracion').select('*').eq('id', 1).single();
         if (!errConfig && configData) {
             isCartaFestiva = configData.carta_festiva;
+            isFestiva = isCartaFestiva;
             const chk = document.getElementById('chkFestiva');
             if (chk) chk.checked = isCartaFestiva;
             actualizarInterfazCartaVisual();
         }
 
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
-        if (!errMesas && dbMesas) {
+        if (errMesas) {
+            console.error("Error al cargar mesas:", errMesas.message);
+        } else if (dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
         }
 
         const { data: dbPlatos, error: errPlatos } = await db.from('platos').select('*');
-        if (!errPlatos && dbPlatos) {
+        if (errPlatos) {
+            console.error("Error al cargar platos:", errPlatos.message);
+        } else if (dbPlatos) {
             dishes = dbPlatos.map(p => ({
                 id: p.id,
                 name: p.nombre,
@@ -841,10 +848,11 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
 }
 
 // ==================== CARTA Y CONFIGURACIÓN EN BD ====================
-async function toggleCartaFestiva(isFestiva) {
-    isCartaFestiva = isFestiva;
+async function toggleCartaFestiva(isFestivaParam) {
+    isCartaFestiva = isFestivaParam;
+    isFestiva = isCartaFestiva;
 
-    const { error } = await db.from('configuracion').update({ carta_festiva: isFestiva }).eq('id', 1);
+    const { error } = await db.from('configuracion').update({ carta_festiva: isFestivaParam }).eq('id', 1);
     if (error) {
         alert('Error al actualizar el tipo de carta en la BD: ' + error.message);
         return;
@@ -860,8 +868,8 @@ function actualizarInterfazCartaVisual() {
 
     const lblNormal = document.getElementById('lblCartaNormal');
     const lblFestiva = document.getElementById('lblCartaFestiva');
-    if (lblNormal) lblNormal.classList.toggle('active', !isFestiva);
-    if (lblFestiva) lblFestiva.classList.toggle('active', isFestiva);
+    if (lblNormal) lblNormal.classList.toggle('active', !isCartaFestiva);
+    if (lblFestiva) lblFestiva.classList.toggle('active', isCartaFestiva);
 
     const badge = document.getElementById('meseroCartaBadge');
     if (badge) {
