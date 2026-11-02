@@ -5,6 +5,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 window.supabaseClient = window.supabaseClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const db = window.supabaseClient;
 
+let currentUserProfile = null;
 let currentRole = 'mesero';
 let isCartaFestiva = false;
 
@@ -21,19 +22,11 @@ let dishPendingMod = null;
 let selectedComandaCaja = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Recuperar estado persistente del switch de carta festiva
-    const savedCarta = localStorage.getItem('cf_is_festiva');
-    if (savedCarta !== null) {
-        isCartaFestiva = savedCarta === 'true';
-        const chk = document.getElementById('chkFestiva');
-        if (chk) chk.checked = isCartaFestiva;
-    }
-
     const loggedUser = localStorage.getItem('cf_user');
     if (loggedUser) {
         try {
-            const perfil = JSON.parse(loggedUser);
-            activarSesion(perfil);
+            currentUserProfile = JSON.parse(loggedUser);
+            activarSesion(currentUserProfile);
         } catch (e) {
             localStorage.removeItem('cf_user');
         }
@@ -41,9 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarDatosDesdeSupabase();
     configurarSupabaseRealtime();
-    
-    // Aplicar estado inicial de la carta visualmente
-    toggleCartaFestiva(isCartaFestiva, false);
 });
 
 // ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA) ====================
@@ -51,13 +41,29 @@ function configurarSupabaseRealtime() {
     db.channel('public-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
           console.log('Cambio detectado en tiempo real:', payload);
-          sincronizarComandasDesdeDB();
+          if (payload.table === 'configuracion') {
+              isCartaFestiva = payload.new.carta_festiva;
+              const chk = document.getElementById('chkFestiva');
+              if (chk) chk.checked = isCartaFestiva;
+              actualizarInterfazCartaVisual();
+              renderDishes('Todas');
+          } else {
+              sincronizarComandasDesdeDB();
+          }
       })
       .subscribe();
 }
 
 async function cargarDatosDesdeSupabase() {
     try {
+        const { data: configData, error: errConfig } = await db.from('configuracion').select('*').eq('id', 1).single();
+        if (!errConfig && configData) {
+            isCartaFestiva = configData.carta_festiva;
+            const chk = document.getElementById('chkFestiva');
+            if (chk) chk.checked = isCartaFestiva;
+            actualizarInterfazCartaVisual();
+        }
+
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
         if (!errMesas && dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
@@ -134,6 +140,7 @@ async function handleLogin(event) {
         if (String(perfil.password).trim() !== String(passwordInput).trim()) { alert('Contraseña incorrecta.'); return; }
         if (!perfil.activo) { alert('Tu cuenta está desactivada.'); return; }
 
+        currentUserProfile = perfil;
         localStorage.setItem('cf_user', JSON.stringify(perfil));
         activarSesion(perfil);
     } catch (err) {
@@ -150,6 +157,7 @@ function activarSesion(perfil) {
 
 function handleLogout() {
     localStorage.removeItem('cf_user');
+    currentUserProfile = null;
     location.reload();
 }
 
@@ -247,6 +255,16 @@ function handleTableClick(tableName) {
     document.getElementById('currentOrderTitle').innerText = selectedTable;
     document.getElementById('cartTableTitle').innerText = selectedTable;
 
+    const taperSec = document.getElementById('taperSection');
+    const tapersInput = document.getElementById('tapersInput');
+    if (tableName.includes('Delivery') || tableName.includes('Llevar')) {
+        if (taperSec) taperSec.classList.remove('hidden');
+        if (tapersInput) tapersInput.value = "0";
+    } else {
+        if (taperSec) taperSec.classList.add('hidden');
+        if (tapersInput) tapersInput.value = "0";
+    }
+
     const clientSpan = document.getElementById('assignedClientTag');
     if (activeClients[selectedTable]) {
         clientSpan.innerText = `${activeClients[selectedTable].name} (DNI: ${activeClients[selectedTable].dni})`;
@@ -264,10 +282,69 @@ function closeOrderSection() {
     renderTables();
 }
 
-// ==================== ASIGNAR CLIENTE & BÚSQUEDA POR DNI ====================
+// ==================== MOVER PEDIDO DE MESA ====================
+function openMoveTableModal() {
+    if (!selectedTable) return;
+    const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
+    if (!existingOrder) {
+        alert('Esta mesa no tiene comandas activas pendientes por mover.');
+        return;
+    }
+
+    const select = document.getElementById('targetTableSelect');
+    select.innerHTML = '';
+
+    const availableTables = tables.filter(t => t.status === 'free' && t.name !== selectedTable);
+    if (availableTables.length === 0) {
+        select.innerHTML = `<option value="">No hay mesas libres disponibles</option>`;
+    } else {
+        availableTables.forEach(t => {
+            select.innerHTML += `<option value="${t.name}">${t.name}</option>`;
+        });
+    }
+
+    document.getElementById('moveTableModal').classList.remove('hidden');
+}
+
+function closeMoveTableModal() {
+    document.getElementById('moveTableModal').classList.add('hidden');
+}
+
+async function confirmMoveTable() {
+    const targetTable = document.getElementById('targetTableSelect').value;
+    if (!targetTable) {
+        alert('Selecciona una mesa destino válida.');
+        return;
+    }
+
+    const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
+    if (!existingOrder) return;
+
+    try {
+        const { error } = await db.from('comandas').update({ mesa: targetTable }).eq('id', existingOrder.id);
+        if (error) {
+            alert('Error al mover comanda: ' + error.message);
+            return;
+        }
+
+        if (activeClients[selectedTable]) {
+            activeClients[targetTable] = activeClients[selectedTable];
+            delete activeClients[selectedTable];
+        }
+
+        alert(`¡Pedido trasladado exitosamente de ${selectedTable} a ${targetTable}!`);
+        closeMoveTableModal();
+        closeOrderSection();
+        await sincronizarComandasDesdeDB();
+    } catch (e) {
+        console.error("Error al mover mesa:", e);
+    }
+}
+
+// ==================== ASIGNAR CLIENTE & BÚSQUEDA POR NOMBRE ====================
 function openClientModal() {
-    document.getElementById('clientDniInput').value = '';
     document.getElementById('clientNameInput').value = '';
+    document.getElementById('clientDniInput').value = '';
     document.getElementById('clientPhoneInput').value = '';
     document.getElementById('clientModal').classList.remove('hidden');
 }
@@ -276,10 +353,10 @@ function closeClientModal() {
     document.getElementById('clientModal').classList.add('hidden');
 }
 
-async function buscarClientePorDni() {
-    const dni = document.getElementById('clientDniInput').value.trim();
-    if (!dni) {
-        alert('Por favor ingresa un número de DNI para buscar.');
+async function buscarClientePorNombre() {
+    const nombreBuscado = document.getElementById('clientNameInput').value.trim();
+    if (!nombreBuscado) {
+        alert('Por favor ingresa un nombre para buscar.');
         return;
     }
 
@@ -287,18 +364,20 @@ async function buscarClientePorDni() {
         const { data, error } = await db
             .from('clientes')
             .select('*')
-            .eq('dni', dni)
-            .single();
+            .ilike('nombre', `%${nombreBuscado}%`)
+            .limit(1);
 
-        if (error || !data) {
-            alert('Cliente no encontrado en la base de datos. Por favor completa los datos manualmente.');
-            document.getElementById('clientNameInput').value = '';
+        if (error || !data || data.length === 0) {
+            alert('Cliente no encontrado en la base de datos con ese nombre. Por favor completa los datos manualmente.');
+            document.getElementById('clientDniInput').value = '';
             document.getElementById('clientPhoneInput').value = '';
-            document.getElementById('clientNameInput').focus();
+            document.getElementById('clientDniInput').focus();
         } else {
-            document.getElementById('clientNameInput').value = data.nombre || '';
-            document.getElementById('clientPhoneInput').value = data.telefono || '';
-            alert('¡Cliente encontrado y cargado con éxito!');
+            const cliente = data[0];
+            document.getElementById('clientNameInput').value = cliente.nombre || '';
+            document.getElementById('clientDniInput').value = cliente.dni || '';
+            document.getElementById('clientPhoneInput').value = cliente.telefono || '';
+            alert(`¡Cliente "${cliente.nombre}" encontrado y cargado con éxito!`);
         }
     } catch (err) {
         console.error("Error al buscar cliente:", err);
@@ -414,28 +493,92 @@ function updateCartUI() {
     const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
     let allItemsToDisplay = existingOrder ? [...existingOrder.items, ...tempOrderCart] : [...tempOrderCart];
 
-    if (allItemsToDisplay.length === 0) {
+    let tapersCount = 0;
+    const tapersInput = document.getElementById('tapersInput');
+    if (selectedTable && (selectedTable.includes('Delivery') || selectedTable.includes('Llevar'))) {
+        tapersCount = parseInt(tapersInput ? tapersInput.value : 0) || 0;
+    }
+
+    if (allItemsToDisplay.length === 0 && tapersCount === 0) {
         itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
     } else {
         itemsContainer.innerHTML = '';
         allItemsToDisplay.forEach((item, index) => {
             let isNew = index >= (existingOrder ? existingOrder.items.length : 0);
+
             itemsContainer.innerHTML += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                     <span>${item.name} - S/ ${item.price.toFixed(2)} ${isNew ? '<span style="color:var(--accent-green); font-size:0.7rem;">(Nuevo)</span>' : ''}</span>
-                    ${isNew ? `<button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index - (existingOrder ? existingOrder.items.length : 0)},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>` : ''}
+                    <div style="display:flex; gap:0.3rem; align-items:center;">
+                        ${isNew ? `<button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index - (existingOrder ? existingOrder.items.length : 0)},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>` : ''}
+                        ${!isNew ? `<button class="btn btn-danger btn-sm" onclick="eliminarItemComandaSeguro(${existingOrder.id}, ${item.id})" title="Eliminar plato (Solo Admin)" style="padding:0.1rem 0.4rem; font-size:0.7rem; background:var(--accent-red); color:#fff;">🗑️</button>` : ''}
+                    </div>
                 </div>
             `;
         });
+
+        if (tapersCount > 0) {
+            itemsContainer.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); color:var(--accent-yellow);">
+                    <span>📦 ${tapersCount} Táper(s) S/ 1.00 c/u</span>
+                    <span>S/ ${(tapersCount * 1.00).toFixed(2)}</span>
+                </div>
+            `;
+        }
     }
-    let subtotal = allItemsToDisplay.reduce((acc, item) => acc + item.price, 0);
-    document.getElementById('cartTotal').innerText = `S/ ${subtotal.toFixed(2)}`;
+
+    let subtotalItems = allItemsToDisplay.reduce((acc, item) => acc + item.price, 0);
+    let totalSub = subtotalItems + (tapersCount * 1.00);
+    document.getElementById('cartTotal').innerText = `S/ ${totalSub.toFixed(2)}`;
+}
+
+// ==================== ELIMINAR ÍTEM CON RESTRICCIÓN DE ADMIN ====================
+async function eliminarItemComandaSeguro(comandaId, itemId) {
+    if (!currentUserProfile || currentUserProfile.rol !== 'admin') {
+        alert('⚠️ ACCESO DENEGADO: Solo el Administrador puede eliminar platos de una comanda ya enviada a cocina.');
+        return;
+    }
+
+    if (!confirm('¿Estás seguro de eliminar este plato de la comanda?')) return;
+
+    try {
+        const { error } = await db.from('items_comanda').delete().eq('id', itemId);
+        if (error) {
+            alert('Error al eliminar ítem: ' + error.message);
+            return;
+        }
+
+        const comanda = kitchenOrders.find(o => o.id === comandaId);
+        if (comanda) {
+            const nuevosItems = comanda.items.filter(i => i.id !== itemId);
+            let nuevoTotal = nuevosItems.reduce((acc, i) => acc + i.price, 0);
+            await db.from('comandas').update({ total: nuevoTotal }).eq('id', comandaId);
+        }
+
+        alert('Plato eliminado correctamente.');
+        await sincronizarComandasDesdeDB();
+        updateCartUI();
+    } catch (e) {
+        console.error("Error eliminando ítem:", e);
+    }
 }
 
 async function enviarPedidoACocina() {
-    if (!selectedTable || tempOrderCart.length === 0) {
-        alert('Agrega nuevos platos antes de enviar a cocina.');
+    if (!selectedTable) return;
+
+    let itemsAEnviar = [...tempOrderCart];
+    const tapersInput = document.getElementById('tapersInput');
+    let tapersCount = (selectedTable.includes('Delivery') || selectedTable.includes('Llevar')) ? (parseInt(tapersInput ? tapersInput.value : 0) || 0) : 0;
+
+    if (itemsAEnviar.length === 0 && tapersCount === 0) {
+        alert('Agrega nuevos platos o tápers antes de enviar a cocina.');
         return;
+    }
+
+    if (tapersCount > 0) {
+        for (let i = 0; i < tapersCount; i++) {
+            itemsAEnviar.push({ name: '📦 Táper Adicional', price: 1.00 });
+        }
     }
 
     const clienteAsignado = activeClients[selectedTable];
@@ -444,16 +587,16 @@ async function enviarPedidoACocina() {
     let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
 
     if (existingComanda) {
-        const itemsIns = tempOrderCart.map(i => ({ comanda_id: existingComanda.id, nombre_plato: i.name, precio: i.price }));
+        const itemsIns = itemsAEnviar.map(i => ({ comanda_id: existingComanda.id, nombre_plato: i.name, precio: i.price }));
         await db.from('items_comanda').insert(itemsIns);
 
-        let nuevoTotalTotal = existingComanda.total + tempOrderCart.reduce((acc, i) => acc + i.price, 0);
+        let nuevoTotalTotal = existingComanda.total + itemsAEnviar.reduce((acc, i) => acc + i.price, 0);
         let updateData = { total: nuevoTotalTotal };
         if (clienteDni) updateData.cliente_dni = clienteDni;
 
         await db.from('comandas').update(updateData).eq('id', existingComanda.id);
     } else {
-        let totalMonto = tempOrderCart.reduce((acc, i) => acc + i.price, 0);
+        let totalMonto = itemsAEnviar.reduce((acc, i) => acc + i.price, 0);
         const { data: comRes, error: errC } = await db.from('comandas').insert([{ 
             mesa: selectedTable, 
             estado: 'pendiente', 
@@ -464,12 +607,13 @@ async function enviarPedidoACocina() {
         if (errC) { alert('Error: ' + errC.message); return; }
 
         const comandaId = comRes[0].id;
-        const itemsIns = tempOrderCart.map(i => ({ comanda_id: comandaId, nombre_plato: i.name, precio: i.price }));
+        const itemsIns = itemsAEnviar.map(i => ({ comanda_id: comandaId, nombre_plato: i.name, precio: i.price }));
         await db.from('items_comanda').insert(itemsIns);
     }
 
     alert(`¡Pedido enviado a cocina con éxito!`);
     tempOrderCart = [];
+    if (tapersInput) tapersInput.value = "0";
     await sincronizarComandasDesdeDB();
     updateCartUI();
 }
@@ -513,8 +657,8 @@ function renderCajaView() {
     if (!grid) return;
 
     const activeTickets = kitchenOrders.filter(o => o.status !== 'cobrado');
-    let salonCount = activeTickets.filter(t => !t.table.includes('Delivery')).length;
-    let llevarCount = activeTickets.filter(t => t.table.includes('Delivery')).length;
+    let salonCount = activeTickets.filter(t => !t.table.includes('Delivery') && !t.table.includes('Llevar')).length;
+    let llevarCount = activeTickets.filter(t => t.table.includes('Delivery') || t.table.includes('Llevar')).length;
     let totalCobrar = activeTickets.reduce((acc, t) => acc + t.total, 0);
 
     document.getElementById('cajaTotalCuentas').innerText = activeTickets.length;
@@ -696,17 +840,23 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
     }
 }
 
-// ==================== CARTA Y REPORTES ADMINISTRADOR ====================
-function toggleCartaFestiva(isFestiva, guardarEnStorage = true) {
+// ==================== CARTA Y CONFIGURACIÓN EN BD ====================
+async function toggleCartaFestiva(isFestiva) {
     isCartaFestiva = isFestiva;
-    
-    // Guardar en localStorage para que persista al actualizar la página
-    if (guardarEnStorage) {
-        localStorage.setItem('cf_is_festiva', isFestiva);
+
+    const { error } = await db.from('configuracion').update({ carta_festiva: isFestiva }).eq('id', 1);
+    if (error) {
+        alert('Error al actualizar el tipo de carta en la BD: ' + error.message);
+        return;
     }
-    
+
+    actualizarInterfazCartaVisual();
+    renderDishes('Todas');
+}
+
+function actualizarInterfazCartaVisual() {
     const chk = document.getElementById('chkFestiva');
-    if (chk) chk.checked = isFestiva;
+    if (chk) chk.checked = isCartaFestiva;
 
     const lblNormal = document.getElementById('lblCartaNormal');
     const lblFestiva = document.getElementById('lblCartaFestiva');
@@ -715,11 +865,9 @@ function toggleCartaFestiva(isFestiva, guardarEnStorage = true) {
 
     const badge = document.getElementById('meseroCartaBadge');
     if (badge) {
-        badge.innerText = isFestiva ? "🎉 Carta Festiva Activa" : "📋 Carta Normal Activa";
-        badge.style.color = isFestiva ? "var(--accent-yellow)" : "var(--accent-green)";
+        badge.innerText = isCartaFestiva ? "🎉 Carta Festiva Activa" : "📋 Carta Normal Activa";
+        badge.style.color = isCartaFestiva ? "var(--accent-yellow)" : "var(--accent-green)";
     }
-
-    renderDishes('Todas');
 }
 
 async function registrarGasto(event) {

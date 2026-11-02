@@ -52,18 +52,18 @@
     <div id="clientModal" class="modal-overlay hidden">
         <div class="modal-card">
             <h3>Asignar Cliente</h3>
-            <p class="text-muted">Busca por DNI o ingresa los datos del cliente.</p>
+            <p class="text-muted">Busca por nombre o ingresa los datos del cliente.</p>
             <form id="formCliente" onsubmit="guardarClienteMesa(event)">
                 <div class="form-group">
-                    <label>DNI</label>
+                    <label>Nombre del Cliente</label>
                     <div class="input-with-action">
-                        <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" required />
-                        <button type="button" class="btn btn-secondary" onclick="buscarClientePorDni()" title="Buscar en base de datos">🔍</button>
+                        <input type="text" id="clientNameInput" placeholder="Nombre completo a buscar" required />
+                        <button type="button" class="btn btn-secondary" onclick="buscarClientePorNombre()" title="Buscar en base de datos">🔍</button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="clientNameInput" placeholder="Nombre completo" required />
+                    <label>DNI</label>
+                    <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" required />
                 </div>
                 <div class="form-group">
                     <label>Celular</label>
@@ -74,6 +74,22 @@
                     <button type="submit" class="btn btn-primary">Guardar Cliente</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL MOVER MESA ==================== -->
+    <div id="moveTableModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Mover Pedido a Otra Mesa</h3>
+            <p class="text-muted">Selecciona la mesa destino para trasladar la comanda actual.</p>
+            <div class="form-group mt-3">
+                <label>Mesa Destino Disponible:</label>
+                <select id="targetTableSelect" class="form-control" style="width:100%; padding:0.6rem; border-radius:6px; background:#1e1e24; color:#fff; border:1px solid var(--border-color);"></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeMoveTableModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmMoveTable()">Confirmar Traslado</button>
+            </div>
         </div>
     </div>
 
@@ -134,8 +150,9 @@
                     <div class="order-nav-header">
                         <button class="btn-back" onclick="closeOrderSection()">← Volver</button>
                         <h2 id="currentOrderTitle">Mesa 1</h2>
-                        <div class="order-client-action">
-                            <span id="assignedClientTag" class="loyalty-tag mr-2">Sin cliente</span>
+                        <div class="order-client-action" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="openMoveTableModal()">🔄 Mover Mesa</button>
+                            <span id="assignedClientTag" class="loyalty-tag">Sin cliente</span>
                             <button class="btn btn-secondary btn-sm" onclick="openClientModal()">+ Cliente</button>
                         </div>
                     </div>
@@ -156,6 +173,13 @@
 
                         <div class="cart-container">
                             <h4 id="cartTableTitle">Mesa 1</h4>
+                            
+                            <!-- Sección de Tápers para Llevar / Delivery -->
+                            <div id="taperSection" class="hidden" style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin:0.8rem 0; border:1px solid var(--border-color);">
+                                <label style="font-size:0.85rem; display:block; margin-bottom:0.3rem;">📦 Cantidad de Tápers (S/ 1.00 c/u):</label>
+                                <input type="number" id="tapersInput" min="0" value="0" onchange="updateCartUI()" style="width:100%; padding:0.4rem; border-radius:6px; background:#2b2d42; color:#fff; border:1px solid var(--border-color);" />
+                            </div>
+
                             <div id="cartItems" class="cart-items">
                                 <p class="empty-msg">Sin ítems aún.</p>
                             </div>
