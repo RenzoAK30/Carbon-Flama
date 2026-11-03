@@ -174,7 +174,6 @@
                         <div class="cart-container">
                             <h4 id="cartTableTitle">Mesa 1</h4>
                             
-                            <!-- Sección de Tápers para Llevar / Delivery -->
                             <div id="taperSection" class="hidden" style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin:0.8rem 0; border:1px solid var(--border-color);">
                                 <label style="font-size:0.85rem; display:block; margin-bottom:0.3rem;">📦 Cantidad de Tápers (S/ 1.00 c/u):</label>
                                 <input type="number" id="tapersInput" min="0" value="0" onchange="updateCartUI()" style="width:100%; padding:0.4rem; border-radius:6px; background:#2b2d42; color:#fff; border:1px solid var(--border-color);" />
@@ -270,6 +269,7 @@
                         <div class="kpi-card success"><h4>Utilidad Neta</h4><p id="kpiUtilidad">S/ 0.00</p></div>
                     </div>
 
+                    <!-- Filtro General de Ventas -->
                     <div class="form-card">
                         <h3>Filtrar Reporte de Ventas</h3>
                         <div class="form-row">
@@ -288,7 +288,32 @@
                         <div id="reporteFiltradoResultado" class="mt-3"></div>
                     </div>
 
-                    <div class="form-card">
+                    <!-- NUEVA TARJETA: REPORTE DE GASEOSAS / BEBIDAS -->
+                    <div class="form-card mt-3">
+                        <h3>📊 Reporte de Salida y Utilidad de Gaseosas</h3>
+                        <p class="text-muted">Consulta cuántas unidades salieron por día o rango de fechas y su ganancia neta.</p>
+                        
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label>Desde:</label>
+                                <input type="date" id="reporteGaseosaInicio" />
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Hasta:</label>
+                                <input type="date" id="reporteGaseosaFin" />
+                            </div>
+                            <div style="display:flex; align-items:flex-end;">
+                                <button class="btn btn-primary" onclick="generarReporteGaseosas()">Generar Reporte de Gaseosas</button>
+                            </div>
+                        </div>
+
+                        <div id="resultadoReporteGaseosas" class="mt-3" style="overflow-x:auto;">
+                            <p class="text-muted">Selecciona un rango de fechas y haz clic en generar.</p>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de Gastos -->
+                    <div class="form-card mt-3">
                         <h3>Registrar Gasto del Local</h3>
                         <form id="formGasto" onsubmit="registrarGasto(event)">
                             <div class="form-row">

@@ -50,7 +50,6 @@ function configurarSupabaseRealtime() {
               actualizarInterfazCartaVisual();
               renderDishes('Todas');
           } else {
-              // Sincroniza automáticamente cocina, caja, almacén y administración sin refrescar
               sincronizarComandasDesdeDB();
           }
       })
@@ -193,6 +192,141 @@ function switchAdminTab(tabName, event) {
     if (event) event.currentTarget.classList.add('active');
     document.getElementById(`adminTab-${tabName}`).classList.add('active');
     if (tabName === 'clientes') cargarClientesAdmin();
+}
+
+// ==================== REPORTE DE GASEOSAS Y BEBIDAS ====================
+async function generarReporteGaseosas() {
+    const fechaInicio = document.getElementById('reporteGaseosaInicio').value;
+    const fechaFin = document.getElementById('reporteGaseosaFin').value;
+    const contenedor = document.getElementById('resultadoReporteGaseosas');
+
+    if (!fechaInicio || !fechaFin) {
+        alert('Por favor selecciona una fecha de inicio y una fecha de fin.');
+        return;
+    }
+
+    try {
+        contenedor.innerHTML = `<p class="text-muted">Calculando reporte de gaseosas...</p>`;
+
+        let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
+        let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
+
+        const { data: comandas, error } = await db
+            .from('comandas')
+            .select('*, items_comanda(*)')
+            .eq('estado', 'cobrado')
+            .gte('created_at', inicioIso)
+            .lte('created_at', finIso);
+
+        if (error) {
+            contenedor.innerHTML = `<p style="color:var(--accent-red);">Error al obtener datos: ${error.message}</p>`;
+            return;
+        }
+
+        if (!comandas || comandas.length === 0) {
+            contenedor.innerHTML = `<p class="text-muted">No se registraron ventas en el rango de fechas seleccionado.</p>`;
+            return;
+        }
+
+        const bebidasCatalogo = dishes.filter(d => d.category === 'Bebidas');
+        let resumenBebidas = {};
+
+        bebidasCatalogo.forEach(b => {
+            resumenBebidas[b.name] = {
+                cantidadVendida: 0,
+                precioVentaUnitario: b.price,
+                costoUnitario: b.costo,
+                ingresoTotal: 0,
+                costoTotal: 0,
+                utilidadTotal: 0
+            };
+        });
+
+        comandas.forEach(c => {
+            if (c.items_comanda) {
+                c.items_comanda.forEach(item => {
+                    let bebidaEncontrada = bebidasCatalogo.find(b => item.nombre_plato.includes(b.name));
+                    if (bebidaEncontrada) {
+                        let nombre = bebidaEncontrada.name;
+                        resumenBebidas[nombre].cantidadVendida += 1;
+                        resumenBebidas[nombre].ingresoTotal += item.precio;
+                        resumenBebidas[nombre].costoTotal += bebidaEncontrada.costo;
+                        resumenBebidas[nombre].utilidadTotal += (item.precio - bebidaEncontrada.costo);
+                    }
+                });
+            }
+        });
+
+        let htmlTabla = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Bebida / Gaseosa</th>
+                        <th>Cant. Vendida</th>
+                        <th>P. Venta Prom.</th>
+                        <th>Costo Compra Unit.</th>
+                        <th>Ingreso Total</th>
+                        <th>Costo Total</th>
+                        <th>Utilidad (Ganancia)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        let totalUnidadesGeneral = 0;
+        let totalIngresosGeneral = 0;
+        let totalCostoGeneral = 0;
+        let totalUtilidadGeneral = 0;
+
+        let hayVentasBebidas = false;
+
+        Object.keys(resumenBebidas).forEach(nombre => {
+            let dataBebida = resumenBebidas[nombre];
+            if (dataBebida.cantidadVendida > 0) {
+                hayVentasBebidas = true;
+                totalUnidadesGeneral += dataBebida.cantidadVendida;
+                totalIngresosGeneral += dataBebida.ingresoTotal;
+                totalCostoGeneral += dataBebida.costoTotal;
+                totalUtilidadGeneral += dataBebida.utilidadTotal;
+
+                let pVentaProm = dataBebida.ingresoTotal / dataBebida.cantidadVendida;
+
+                htmlTabla += `
+                    <tr>
+                        <td><b>${nombre}</b></td>
+                        <td><span style="color:var(--accent-yellow);">${dataBebida.cantidadVendida} unids.</span></td>
+                        <td>S/ ${pVentaProm.toFixed(2)}</td>
+                        <td>S/ ${dataBebida.costoUnitario.toFixed(2)}</td>
+                        <td>S/ ${dataBebida.ingresoTotal.toFixed(2)}</td>
+                        <td>S/ ${dataBebida.costoTotal.toFixed(2)}</td>
+                        <td><strong style="color:var(--accent-green);">S/ ${dataBebida.utilidadTotal.toFixed(2)}</strong></td>
+                    </tr>
+                `;
+            }
+        });
+
+        if (!hayVentasBebidas) {
+            contenedor.innerHTML = `<p class="text-muted">No se registraron ventas de gaseosas/bebidas en este período.</p>`;
+            return;
+        }
+
+        htmlTabla += `
+                </tbody>
+            </table>
+            <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:1rem; border:1px solid var(--border-color); display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+                <div><b>Total Unidades Salidas:</b> ${totalUnidadesGeneral}</div>
+                <div><b>Ingreso Bruto:</b> S/ ${totalIngresosGeneral.toFixed(2)}</div>
+                <div><b>Costo Total Invertido:</b> S/ ${totalCostoGeneral.toFixed(2)}</div>
+                <div><h4 style="color:var(--accent-green);">Utilidad Total Gaseosas: S/ ${totalUtilidadGeneral.toFixed(2)}</h4></div>
+            </div>
+        `;
+
+        contenedor.innerHTML = htmlTabla;
+
+    } catch (e) {
+        console.error("Error al generar reporte de gaseosas:", e);
+        contenedor.innerHTML = `<p style="color:var(--accent-red);">Ocurrió un error al procesar el reporte.</p>`;
+    }
 }
 
 // ==================== MAPA DE MESAS ====================
