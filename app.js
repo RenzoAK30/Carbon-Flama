@@ -50,6 +50,7 @@ function configurarSupabaseRealtime() {
               actualizarInterfazCartaVisual();
               renderDishes('Todas');
           } else {
+              // Sincroniza automáticamente cocina, caja, almacén y administración sin refrescar
               sincronizarComandasDesdeDB();
           }
       })
@@ -68,16 +69,12 @@ async function cargarDatosDesdeSupabase() {
         }
 
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
-        if (errMesas) {
-            console.error("Error al cargar mesas:", errMesas.message);
-        } else if (dbMesas) {
+        if (!errMesas && dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
         }
 
         const { data: dbPlatos, error: errPlatos } = await db.from('platos').select('*');
-        if (errPlatos) {
-            console.error("Error al cargar platos:", errPlatos.message);
-        } else if (dbPlatos) {
+        if (!errPlatos && dbPlatos) {
             dishes = dbPlatos.map(p => ({
                 id: p.id,
                 name: p.nombre,
@@ -795,7 +792,6 @@ function imprimirPrecuenta() {
     setTimeout(() => { ventana.print(); }, 300);
 }
 
-// Función auxiliar para restar stock al vender un producto
 async function descontarStockPorItemsPagados(checkboxes) {
     for (let chk of checkboxes) {
         let nombreItem = chk.dataset.name;
@@ -815,7 +811,6 @@ async function cobrarSeleccionados() {
     const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
     let montoPagadoParcial = Array.from(checkboxes).reduce((acc, chk) => acc + parseFloat(chk.dataset.price), 0);
 
-    // Descontar stock de inventario automáticamente
     await descontarStockPorItemsPagados(checkboxes);
 
     for (let id of itemIdsToPay) {
