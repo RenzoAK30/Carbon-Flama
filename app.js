@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarSupabaseRealtime();
 });
 
-// ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA) ====================
+// ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA EN TIEMPO REAL) ====================
 function configurarSupabaseRealtime() {
     db.channel('public-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
@@ -68,12 +68,16 @@ async function cargarDatosDesdeSupabase() {
         }
 
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
-        if (!errMesas && dbMesas) {
+        if (errMesas) {
+            console.error("Error al cargar mesas:", errMesas.message);
+        } else if (dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
         }
 
         const { data: dbPlatos, error: errPlatos } = await db.from('platos').select('*');
-        if (!errPlatos && dbPlatos) {
+        if (errPlatos) {
+            console.error("Error al cargar platos:", errPlatos.message);
+        } else if (dbPlatos) {
             dishes = dbPlatos.map(p => ({
                 id: p.id,
                 name: p.nombre,
@@ -90,6 +94,7 @@ async function cargarDatosDesdeSupabase() {
         renderDishes('Todas');
         renderAdminMenuCategories();
         renderAdminMesas();
+        renderAlmacenView();
         cargarClientesAdmin();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
@@ -121,6 +126,7 @@ async function sincronizarComandasDesdeDB() {
     renderCajaView();
     renderKitchenView();
     renderTables();
+    renderAlmacenView();
     loadFinanzasData();
     cargarClientesAdmin();
 }
@@ -174,6 +180,7 @@ function switchRoleView(role) {
         target.classList.add('active');
         if (role === 'caja') renderCajaView();
         if (role === 'cocina') renderKitchenView();
+        if (role === 'almacen') renderAlmacenView();
         if (role === 'admin') {
             loadFinanzasData();
             cargarClientesAdmin();
@@ -792,7 +799,6 @@ function imprimirPrecuenta() {
 async function descontarStockPorItemsPagados(checkboxes) {
     for (let chk of checkboxes) {
         let nombreItem = chk.dataset.name;
-        // Buscar si el ítem coincide con algún plato registrado en el menú (ej. Gaseosas)
         let platoMatch = dishes.find(d => nombreItem.includes(d.name));
         if (platoMatch && platoMatch.stock > 0) {
             let nuevoStock = platoMatch.stock - 1;
@@ -863,6 +869,58 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
         }
     } catch (e) {
         console.error("Error actualizando consumo del cliente:", e);
+    }
+}
+
+// ==================== ALMACÉN & CONTROL DE STOCK ====================
+function renderAlmacenView() {
+    const tbody = document.getElementById('almacenTableBody');
+    if (!tbody) return;
+
+    if (dishes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4">No hay productos registrados.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = '';
+    dishes.forEach(d => {
+        tbody.innerHTML += `
+            <tr>
+                <td><b>${d.name}</b></td>
+                <td>${d.category}</td>
+                <td><span style="font-size:1.1rem; color:var(--accent-yellow); font-weight:600;">${d.stock} unids.</span></td>
+                <td>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="addStock_${d.id}" placeholder="Cant." min="1" style="width:70px; padding:0.3rem; background:#1e1e24; color:#fff; border:1px solid var(--border-color); border-radius:4px;" />
+                        <button class="btn btn-primary btn-sm" onclick="reabastecerStock(${d.id})">+ Agregar Stock</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function reabastecerStock(platoId) {
+    const inputCant = document.getElementById(`addStock_${platoId}`);
+    const cantidadAñadir = parseInt(inputCant.value);
+
+    if (!cantidadAñadir || cantidadAñadir <= 0) {
+        alert('Ingresa una cantidad válida para reabastecer.');
+        return;
+    }
+
+    const plato = dishes.find(d => d.id === platoId);
+    if (!plato) return;
+
+    let nuevoStockTotal = plato.stock + cantidadAñadir;
+
+    const { error } = await db.from('platos').update({ stock: nuevoStockTotal }).eq('id', platoId);
+    if (error) {
+        alert('Error al actualizar stock: ' + error.message);
+    } else {
+        alert(`¡Stock actualizado! Se agregaron ${cantidadAñadir} unidades de ${plato.name}. Stock total: ${nuevoStockTotal}`);
+        inputCant.value = '';
+        cargarDatosDesdeSupabase();
     }
 }
 
@@ -1076,7 +1134,9 @@ async function agregarPlato(event) {
     const categoria = document.getElementById('platoCategoria').value;
 
     const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo, costo, stock }]);
-    if (error) { alert('Error: ' + error.message); } else {
+    if (error) { 
+        alert('Error: ' + error.message); 
+    } else {
         alert('Producto agregado con éxito');
         document.getElementById('formPlato').reset();
         cargarDatosDesdeSupabase();
