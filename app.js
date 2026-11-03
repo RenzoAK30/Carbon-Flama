@@ -8,7 +8,7 @@ const db = window.supabaseClient;
 let currentUserProfile = null;
 let currentRole = 'mesero';
 let isCartaFestiva = false;
-let isFestiva = false; // Declarada correctamente para evitar ReferenceError
+let isFestiva = false;
 
 let tables = [];
 let dishes = [];
@@ -68,22 +68,20 @@ async function cargarDatosDesdeSupabase() {
         }
 
         const { data: dbMesas, error: errMesas } = await db.from('mesas').select('*');
-        if (errMesas) {
-            console.error("Error al cargar mesas:", errMesas.message);
-        } else if (dbMesas) {
+        if (!errMesas && dbMesas) {
             tables = dbMesas.map(m => ({ id: m.id, name: m.nombre, status: m.status || 'free' }));
         }
 
         const { data: dbPlatos, error: errPlatos } = await db.from('platos').select('*');
-        if (errPlatos) {
-            console.error("Error al cargar platos:", errPlatos.message);
-        } else if (dbPlatos) {
+        if (!errPlatos && dbPlatos) {
             dishes = dbPlatos.map(p => ({
                 id: p.id,
                 name: p.nombre,
                 category: p.categoria,
                 price: parseFloat(p.precio),
-                festivo: p.festivo !== null && p.festivo !== undefined ? parseFloat(p.festivo) : parseFloat(p.precio)
+                festivo: p.festivo !== null && p.festivo !== undefined ? parseFloat(p.festivo) : parseFloat(p.precio),
+                costo: parseFloat(p.costo || 0),
+                stock: parseInt(p.stock || 0)
             }));
         }
 
@@ -432,7 +430,8 @@ function renderDishes(cat) {
         div.innerHTML = `
             <h5>${dish.name}</h5>
             <p>S/ ${currentPrice.toFixed(2)}</p>
-            ${isCartaFestiva ? '<span style="font-size:0.7rem; color:var(--accent-yellow);">Festivo</span>' : '<span style="font-size:0.7rem; color:var(--text-muted);">Normal</span>'}
+            <small class="text-muted">Stock: ${dish.stock}</small>
+            <div>${isCartaFestiva ? '<span style="font-size:0.7rem; color:var(--accent-yellow);">Festivo</span>' : '<span style="font-size:0.7rem; color:var(--text-muted);">Normal</span>'}</div>
         `;
         div.onclick = () => openModModal({ ...dish, price: currentPrice });
         grid.appendChild(div);
@@ -488,7 +487,7 @@ function confirmAddToCart() {
     if (selectedOptionName !== 'Original') finalItemName += ` (${selectedOptionName})`;
     if (comment) finalItemName += ` [Nota: ${comment}]`;
 
-    tempOrderCart.push({ name: finalItemName, price: dishPendingMod.price + extraPrice });
+    tempOrderCart.push({ id: dishPendingMod.id, name: finalItemName, price: dishPendingMod.price + extraPrice });
     updateCartUI();
     closeModModal();
 }
@@ -696,7 +695,7 @@ function openCajaModal(comandaId) {
         listContainer.innerHTML += `
             <div class="caja-item-row">
                 <label style="display:flex; align-items:center; gap:0.8rem; cursor:pointer;">
-                    <input type="checkbox" class="caja-item-chk" value="${item.id}" data-price="${item.price}" checked onchange="calcularTotalCajaModal()">
+                    <input type="checkbox" class="caja-item-chk" value="${item.id}" data-name="${item.name}" data-price="${item.price}" checked onchange="calcularTotalCajaModal()">
                     <span>${item.name}</span>
                 </label>
                 <strong>S/ ${item.price.toFixed(2)}</strong>
@@ -789,12 +788,29 @@ function imprimirPrecuenta() {
     setTimeout(() => { ventana.print(); }, 300);
 }
 
+// Función auxiliar para restar stock al vender un producto
+async function descontarStockPorItemsPagados(checkboxes) {
+    for (let chk of checkboxes) {
+        let nombreItem = chk.dataset.name;
+        // Buscar si el ítem coincide con algún plato registrado en el menú (ej. Gaseosas)
+        let platoMatch = dishes.find(d => nombreItem.includes(d.name));
+        if (platoMatch && platoMatch.stock > 0) {
+            let nuevoStock = platoMatch.stock - 1;
+            await db.from('platos').update({ stock: nuevoStock }).eq('id', platoMatch.id);
+            platoMatch.stock = nuevoStock;
+        }
+    }
+}
+
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
     if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
 
     const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
     let montoPagadoParcial = Array.from(checkboxes).reduce((acc, chk) => acc + parseFloat(chk.dataset.price), 0);
+
+    // Descontar stock de inventario automáticamente
+    await descontarStockPorItemsPagados(checkboxes);
 
     for (let id of itemIdsToPay) {
         await db.from('items_comanda').delete().eq('id', id);
@@ -821,6 +837,9 @@ async function cobrarSeleccionados() {
 
 async function cobrarTodoYDesocupar() {
     if (!selectedComandaCaja) return;
+
+    const checkboxes = document.querySelectorAll('.caja-item-chk');
+    await descontarStockPorItemsPagados(checkboxes);
 
     let montoTotalComanda = selectedComandaCaja.total;
     if (selectedComandaCaja.cliente_dni) {
@@ -891,10 +910,22 @@ async function registrarGasto(event) {
 
 async function loadFinanzasData() {
     try {
-        const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*').eq('estado', 'cobrado');
+        const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*, items_comanda(*)').eq('estado', 'cobrado');
         let totalVentas = 0;
+        let costoVentas = 0;
+
         if (!errC && comandasCobradas) {
-            totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), 0);
+            comandasCobradas.forEach(c => {
+                totalVentas += (parseFloat(c.total) || 0);
+                if (c.items_comanda) {
+                    c.items_comanda.forEach(item => {
+                        let platoMatch = dishes.find(d => item.nombre_plato.includes(d.name));
+                        if (platoMatch) {
+                            costoVentas += (platoMatch.costo || 0);
+                        }
+                    });
+                }
+            });
         }
 
         const { data: gastos, error: errG } = await db.from('gastos').select('*');
@@ -903,7 +934,8 @@ async function loadFinanzasData() {
             totalGastos = gastos.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
         }
 
-        let utilidadNeta = totalVentas - totalGastos;
+        let utilidadBruta = totalVentas - costoVentas;
+        let utilidadNeta = utilidadBruta - totalGastos;
 
         const kpiVentas = document.getElementById('kpiVentasTotal');
         const kpiGastos = document.getElementById('kpiGastosTotal');
@@ -1039,11 +1071,13 @@ async function agregarPlato(event) {
     const precio = parseFloat(document.getElementById('platoPrecio').value);
     const festivoVal = document.getElementById('platoFestivo').value;
     const festivo = festivoVal ? parseFloat(festivoVal) : precio;
+    const costo = parseFloat(document.getElementById('platoCosto').value) || 0;
+    const stock = parseInt(document.getElementById('platoStock').value) || 0;
     const categoria = document.getElementById('platoCategoria').value;
 
-    const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo }]);
+    const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo, costo, stock }]);
     if (error) { alert('Error: ' + error.message); } else {
-        alert('Plato agregado');
+        alert('Producto agregado con éxito');
         document.getElementById('formPlato').reset();
         cargarDatosDesdeSupabase();
     }
@@ -1060,8 +1094,11 @@ function renderAdminMenuCategories() {
         platosCat.forEach(d => {
             itemsHtml += `
                 <div class="menu-item-row">
-                    <span>${d.name}</span>
-                    <div style="text-align: right;"><span class="menu-item-prices">S/ ${d.price.toFixed(2)}</span><div class="menu-item-fest">Fest. S/ ${d.festivo.toFixed(2)}</div></div>
+                    <span><b>${d.name}</b> (Stock: ${d.stock})</span>
+                    <div style="text-align: right;">
+                        <span class="menu-item-prices">P.Venta: S/ ${d.price.toFixed(2)} | Costo: S/ ${d.costo.toFixed(2)}</span>
+                        <div class="menu-item-fest">Fest. S/ ${d.festivo.toFixed(2)}</div>
+                    </div>
                 </div>
             `;
         });
