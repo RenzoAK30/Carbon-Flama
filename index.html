@@ -256,18 +256,18 @@
             <section id="view-almacen" class="role-view">
                 <div class="admin-top-header">
                     <h2>Control de Inventario y Almacén (Kardex)</h2>
-                    <p class="text-muted">Actualiza el stock de bebidas y productos entrantes.</p>
+                    <p class="text-muted">Gestión de materia prima (Chuletas, Maruchas, Tiras Chorizo, Hotdog, Cecina) y Bebidas.</p>
                 </div>
                 <div class="form-card">
-                    <h3>Reabastecer Stock de Productos</h3>
+                    <h3>Inventario y Stock Actual (CRUD Completo)</h3>
                     <div style="overflow-x:auto;">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Producto</th>
+                                    <th>Producto / Insumo</th>
                                     <th>Categoría</th>
                                     <th>Stock Actual</th>
-                                    <th>Acción / Agregar Unidades</th>
+                                    <th>Acciones (Reabastecer / Modificar)</th>
                                 </tr>
                             </thead>
                             <tbody id="almacenTableBody">
@@ -282,7 +282,7 @@
             <section id="view-admin" class="role-view">
                 <div class="admin-top-header">
                     <h2>Administración</h2>
-                    <p>Reportes de ventas, gestión de menú, mesas y usuarios.</p>
+                    <p>Reportes detallados, gestión de menú, mesas y usuarios con diseño optimizado.</p>
                 </div>
                 <div class="admin-tabs-bar">
                     <button class="admin-tab-btn active" onclick="switchAdminTab('reportes', event)">Reportes</button>
@@ -301,9 +301,9 @@
                         <div class="kpi-card success"><h4>Utilidad Neta</h4><p id="kpiUtilidad">S/ 0.00</p></div>
                     </div>
 
-                    <!-- Filtro General de Ventas -->
+                    <!-- Filtro General de Ventas con Detalle Ampliado -->
                     <div class="form-card">
-                        <h3>Filtrar Reporte de Ventas</h3>
+                        <h3>Filtrar Reporte de Ventas Detallado</h3>
                         <div class="form-row">
                             <div class="form-group" style="flex:1;">
                                 <label>Desde:</label>
@@ -314,7 +314,7 @@
                                 <input type="date" id="reporteFechaFin" />
                             </div>
                             <div style="display:flex; align-items:flex-end;">
-                                <button class="btn btn-primary" onclick="filtrarReportesPorFecha()">Filtrar Reporte</button>
+                                <button class="btn btn-primary" onclick="filtrarReportesPorFecha()">Filtrar y Detallar</button>
                             </div>
                         </div>
                         <div id="reporteFiltradoResultado" class="mt-3"></div>
@@ -372,7 +372,7 @@
                         <h3>Agregar producto / bebida con stock y costo</h3>
                         <form id="formPlato" onsubmit="agregarPlato(event)">
                             <div class="form-row">
-                                <input type="text" id="platoNombre" placeholder="Nombre (Ej: Inka Kola 500ml)" required />
+                                <input type="text" id="platoNombre" placeholder="Nombre (Ej: Chuleta / Inka Kola)" required />
                                 <input type="number" step="0.10" id="platoPrecio" placeholder="Precio Venta S/" required />
                                 <input type="number" step="0.10" id="platoFestivo" placeholder="Precio Festivo S/" />
                                 <input type="number" step="0.10" id="platoCosto" placeholder="Costo Compra S/" required />
@@ -427,14 +427,16 @@
                 </div>
 
                 <div id="adminTab-usuarios" class="admin-tab-pane">
-                    <div class="form-card">
+                    <div class="form-card form-compact-section">
                         <h3>Crear cuenta de trabajador</h3>
                         <form onsubmit="crearUsuarioTrabajador(event)">
-                            <div class="form-group"><label>Usuario</label><input type="text" id="usrUser" required /></div>
-                            <div class="form-group"><label>Nombre completo</label><input type="text" id="usrNombre" required /></div>
-                            <div class="form-group"><label>Contraseña</label><input type="password" id="usrPass" required /></div>
-                            <div class="form-group"><label>Rol</label><select id="usrRol"><option value="mesero">Mesero</option><option value="cocina">Cocina</option><option value="caja">Caja</option><option value="almacen">Almacén</option><option value="admin">Administrador</option></select></div>
-                            <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
+                            <div class="form-row">
+                                <div class="form-group"><label>Usuario</label><input type="text" id="usrUser" required /></div>
+                                <div class="form-group"><label>Nombre completo</label><input type="text" id="usrNombre" required /></div>
+                                <div class="form-group"><label>Contraseña</label><input type="password" id="usrPass" required /></div>
+                                <div class="form-group"><label>Rol</label><select id="usrRol"><option value="mesero">Mesero</option><option value="cocina">Cocina</option><option value="caja">Caja</option><option value="almacen">Almacén</option><option value="admin">Administrador</option></select></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block mt-2">+ Crear cuenta</button>
                         </form>
                     </div>
 

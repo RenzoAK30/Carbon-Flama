@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarSupabaseRealtime();
 });
 
-// ==================== REALTIME (ACTUALIZACIÓN AUTOMÁTICA EN TIEMPO REAL) ====================
+// ==================== REALTIME ====================
 function configurarSupabaseRealtime() {
     db.channel('public-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
@@ -134,7 +134,7 @@ async function sincronizarComandasDesdeDB() {
     renderKitchenView();
     renderTables();
     renderAlmacenView();
-    renderAdminMesas(); // Actualiza la vista de mesas y pedidos del Admin
+    renderAdminMesas();
     loadFinanzasData();
     cargarClientesAdmin();
 }
@@ -210,6 +210,58 @@ function switchAdminTab(tabName, event) {
     if (tabName === 'mesas') renderAdminMesas();
 }
 
+// ==================== REPORTE DETALLADO DE VENTAS ====================
+async function filtrarReportesPorFecha() {
+    const fechaInicio = document.getElementById('reporteFechaInicio').value;
+    const fechaFin = document.getElementById('reporteFechaFin').value;
+    const resultadoDiv = document.getElementById('reporteFiltradoResultado');
+
+    if (!fechaInicio || !fechaFin) {
+        alert('Por favor selecciona una fecha de inicio y fin.');
+        return;
+    }
+
+    try {
+        let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
+        let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
+
+        const { data, error } = await db.from('comandas').select('*, items_comanda(*)').eq('estado', 'cobrado').gte('created_at', inicioIso).lte('created_at', finIso);
+        if (error) { resultadoDiv.innerHTML = `<p style="color:var(--accent-red);">Error al filtrar: ${error.message}</p>`; return; }
+
+        let totalRango = data.reduce((acc, c) => acc + parseFloat(c.total), 0);
+
+        let detalleHtml = `
+            <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:0.8rem; border:1px solid var(--border-color);">
+                <p><b>Período:</b> ${fechaInicio} al ${fechaFin}</p>
+                <p><b>Total Comandas Cobradas:</b> ${data.length}</p>
+                <h4 style="color:var(--accent-green); margin:0.5rem 0 1rem 0;">Total Vendido: S/ ${totalRango.toFixed(2)}</h4>
+                
+                <h5>Desglose Detallado de Comandas:</h5>
+                <div style="max-height: 300px; overflow-y:auto; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+        `;
+
+        if (data.length === 0) {
+            detalleHtml += `<p class="text-muted">No hay comandas cobradas en este rango.</p>`;
+        } else {
+            data.forEach(c => {
+                let itemsList = c.items_comanda ? c.items_comanda.map(i => `${i.nombre_plato} (S/ ${parseFloat(i.precio).toFixed(2)})`).join(', ') : 'Sin ítems';
+                detalleHtml += `
+                    <div style="background:#2b2d42; padding:0.6rem; border-radius:6px; font-size:0.85rem; border:1px solid var(--border-color);">
+                        <b>Mesa/Llevar:</b> ${c.mesa} | <b>Cliente:</b> ${c.cliente_nombre || 'Sin nombre'} | <b>Hora:</b> ${new Date(c.created_at).toLocaleTimeString()}<br>
+                        <b>Ítems:</b> ${itemsList}<br>
+                        <span style="color:var(--primary-color); font-weight:600;">Total Comanda: S/ ${parseFloat(c.total).toFixed(2)}</span>
+                    </div>
+                `;
+            });
+        }
+
+        detalleHtml += `</div></div>`;
+        resultadoDiv.innerHTML = detalleHtml;
+    } catch (e) {
+        console.error("Error en reporte detallado:", e);
+    }
+}
+
 // ==================== REPORTE DE BEBIDAS Y UTILIDAD ====================
 async function generarReporteGaseosas() {
     const fechaInicio = document.getElementById('reporteGaseosaInicio').value;
@@ -266,14 +318,14 @@ async function generarReporteGaseosas() {
             if (c.items_comanda) {
                 c.items_comanda.forEach(item => {
                     let nombreItemLimpio = item.nombre_plato.toLowerCase();
-                    let bebidaEncontrada = bebidasCatalogo.find(b => nombreItemLimpio.includes(b.name.toLowerCase()));
-                    if (bebidaEncontrada) {
-                        let nombre = bebidaEncontrada.name;
-                        resumenBebidas[nombre].cantidadVendida += 1;
-                        resumenBebidas[nombre].ingresoTotal += parseFloat(item.precio || 0);
-                        resumenBebidas[nombre].costoTotal += parseFloat(bebidaEncontrada.costo || 0);
-                        resumenBebidas[nombre].utilidadTotal += (parseFloat(item.precio || 0) - parseFloat(bebidaEncontrada.costo || 0));
-                    }
+                    bebidasCatalogo.forEach(b => {
+                        if (nombreItemLimpio.includes(b.name.toLowerCase())) {
+                            resumenBebidas[b.name].cantidadVendida += 1;
+                            resumenBebidas[b.name].ingresoTotal += parseFloat(item.precio || 0);
+                            resumenBebidas[b.name].costoTotal += parseFloat(b.costo || 0);
+                            resumenBebidas[b.name].utilidadTotal += (parseFloat(item.precio || 0) - parseFloat(b.costo || 0));
+                        }
+                    });
                 });
             }
         });
@@ -501,7 +553,7 @@ async function confirmMoveTable() {
     }
 }
 
-// ==================== NOMBRE RÁPIDO CLIENTE (MESERO) ====================
+// ==================== NOMBRE RÁPIDO CLIENTE ====================
 function openQuickClientModal() {
     document.getElementById('quickClientNameInput').value = activeClientNames[selectedTable] || '';
     document.getElementById('clientQuickModal').classList.remove('hidden');
@@ -652,7 +704,7 @@ function updateCartUI() {
     document.getElementById('cartTotal').innerText = `S/ ${totalSub.toFixed(2)}`;
 }
 
-// ==================== ELIMINAR ÍTEM (ADMIN / SEGURIDAD) ====================
+// ==================== ELIMINAR ÍTEM ====================
 async function eliminarItemComandaSeguro(comandaId, itemId) {
     if (!currentUserProfile || (currentUserProfile.rol !== 'admin' && currentUserProfile.rol !== 'mesero')) {
         alert('⚠️ No tienes permisos para eliminar ítems.');
@@ -766,7 +818,7 @@ async function updateOrderStatus(id, newStatus) {
     await sincronizarComandasDesdeDB();
 }
 
-// ==================== VISTA CAJA & CUENTAS SEPARADAS ====================
+// ==================== CAJA & CUENTAS ====================
 function renderCajaView() {
     const grid = document.getElementById('cajaCardsGrid');
     if (!grid) return;
@@ -843,12 +895,11 @@ async function buscarClienteCajaPorDni() {
                 document.getElementById('cajaClientPhone').value = data.telefono || '';
             }
         } catch (e) {
-            console.error("Cliente no encontrado previamente:", e);
+            console.error("Cliente no encontrado:", e);
         }
     }
 }
 
-// IMPRESIÓN DE PRECUENTA - TICKETERA TÉRMICA 80mm
 function imprimirPrecuenta() {
     if (!selectedComandaCaja) return;
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
@@ -871,14 +922,7 @@ function imprimirPrecuenta() {
             <title>Precuenta - Carbón & Flama</title>
             <style>
                 @page { size: 80mm auto; margin: 0; }
-                body {
-                    font-family: 'Courier New', Courier, monospace;
-                    width: 72mm;
-                    margin: 4mm auto;
-                    font-size: 12px;
-                    color: #000;
-                    text-align: left;
-                }
+                body { font-family: 'Courier New', Courier, monospace; width: 72mm; margin: 4mm auto; font-size: 12px; color: #000; text-align: left; }
                 .text-center { text-align: center; }
                 .bold { font-weight: bold; }
                 hr { border: dashed 1px #000; margin: 5px 0; }
@@ -902,14 +946,9 @@ function imprimirPrecuenta() {
                 `).join('')}
             </div>
             <hr/>
-            <div style="font-size: 14px; text-align: right;" class="bold">
-                TOTAL: S/ ${sub.toFixed(2)}
-            </div>
+            <div style="font-size: 14px; text-align: right;" class="bold">TOTAL: S/ ${sub.toFixed(2)}</div>
             <hr/>
-            <div class="text-center" style="font-size: 10px; margin-top: 10px;">
-                ¡Gracias por su preferencia!<br>
-                Documento no válido como comprobante de pago.
-            </div>
+            <div class="text-center" style="font-size: 10px; margin-top: 10px;">¡Gracias por su preferencia!<br>Documento no válido como comprobante.</div>
         </body>
         </html>
     `);
@@ -919,8 +958,8 @@ function imprimirPrecuenta() {
 
 async function descontarStockPorItemsPagados(checkboxes) {
     for (let chk of checkboxes) {
-        let nombreItem = chk.dataset.name;
-        let platoMatch = dishes.find(d => nombreItem.includes(d.name));
+        let nombreItem = chk.dataset.name.toLowerCase();
+        let platoMatch = dishes.find(d => nombreItem.includes(d.name.toLowerCase()));
         if (platoMatch && platoMatch.stock > 0) {
             let nuevoStock = platoMatch.stock - 1;
             await db.from('platos').update({ stock: nuevoStock }).eq('id', platoMatch.id);
@@ -1003,31 +1042,42 @@ async function actualizarConsumoCliente(dni, montoAdicional) {
             await db.from('clientes').update({ consumo_total: nuevoTotal }).eq('dni', dni);
         }
     } catch (e) {
-        console.error("Error actualizando consumo del cliente:", e);
+        console.error("Error actualizando consumo:", e);
     }
 }
 
-// ==================== ALMACÉN & CONTROL DE STOCK ====================
+// ==================== ALMACÉN & CRUD KARDEX ESTRICTO ====================
 function renderAlmacenView() {
     const tbody = document.getElementById('almacenTableBody');
     if (!tbody) return;
 
-    if (dishes.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4">No hay productos registrados.</td></tr>`;
+    // Filtrar estrictamente solo Bebidas y materias primas solicitadas
+    const insumosPermitidos = ['chuleta', 'marucha', 'tira', 'chorizo', 'hotdog', 'cecina'];
+    const productosAlmacen = dishes.filter(d => {
+        let cat = (d.category || '').toLowerCase();
+        let nom = (d.name || '').toLowerCase();
+        if (cat === 'bebidas') return true;
+        return insumosPermitidos.some(ins => nom.includes(ins));
+    });
+
+    if (productosAlmacen.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4">No hay productos ni materias primas configuradas para almacén.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = '';
-    dishes.forEach(d => {
+    productosAlmacen.forEach(d => {
         tbody.innerHTML += `
             <tr>
                 <td><b>${d.name}</b></td>
                 <td>${d.category}</td>
-                <td><span style="font-size:1.1rem; color:var(--accent-yellow); font-weight:600;">${d.stock} unids.</span></td>
+                <td><span style="font-size:1.05rem; color:var(--accent-yellow); font-weight:600;">${d.stock} unids.</span></td>
                 <td>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <input type="number" id="addStock_${d.id}" placeholder="Cant." min="1" style="width:70px; padding:0.3rem; background:#1e1e24; color:#fff; border:1px solid var(--border-color); border-radius:4px;" />
-                        <button class="btn btn-primary btn-sm" onclick="reabastecerStock(${d.id})">+ Agregar Stock</button>
+                    <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                        <input type="number" id="inputStock_${d.id}" value="${d.stock}" min="0" style="width:70px; padding:0.3rem; background:#1e1e24; color:#fff; border:1px solid var(--border-color); border-radius:4px;" />
+                        <button class="btn btn-primary btn-sm" onclick="crudActualizarStock(${d.id}, 'fijar')">💾 Guardar</button>
+                        <input type="number" id="addStock_${d.id}" placeholder="+Cant" min="1" style="width:60px; padding:0.3rem; background:#1e1e24; color:#fff; border:1px solid var(--border-color); border-radius:4px;" />
+                        <button class="btn btn-success btn-sm" onclick="crudActualizarStock(${d.id}, 'sumar')">+ Sumar</button>
                     </div>
                 </td>
             </tr>
@@ -1035,38 +1085,44 @@ function renderAlmacenView() {
     });
 }
 
-async function reabastecerStock(platoId) {
-    const inputCant = document.getElementById(`addStock_${platoId}`);
-    const cantidadAñadir = parseInt(inputCant.value);
-
-    if (!cantidadAñadir || cantidadAñadir <= 0) {
-        alert('Ingresa una cantidad válida para reabastecer.');
-        return;
-    }
-
+async function crudActualizarStock(platoId, modo) {
+    let nuevoStockTotal = 0;
     const plato = dishes.find(d => d.id === platoId);
     if (!plato) return;
 
-    let nuevoStockTotal = plato.stock + cantidadAñadir;
+    if (modo === 'fijar') {
+        const inputVal = document.getElementById(`inputStock_${platoId}`).value;
+        nuevoStockTotal = parseInt(inputVal);
+        if (isNaN(nuevoStockTotal) || nuevoStockTotal < 0) {
+            alert('Ingresa un valor de stock válido.');
+            return;
+        }
+    } else if (modo === 'sumar') {
+        const cantSumar = parseInt(document.getElementById(`addStock_${platoId}`).value);
+        if (!cantSumar || cantSumar <= 0) {
+            alert('Ingresa una cantidad válida para sumar.');
+            return;
+        }
+        nuevoStockTotal = plato.stock + cantSumar;
+    }
 
     const { error } = await db.from('platos').update({ stock: nuevoStockTotal }).eq('id', platoId);
     if (error) {
-        alert('Error al actualizar stock: ' + error.message);
+        alert('Error al actualizar inventario: ' + error.message);
     } else {
-        alert(`¡Stock actualizado! Se agregaron ${cantidadAñadir} unidades de ${plato.name}. Stock total: ${nuevoStockTotal}`);
-        inputCant.value = '';
-        cargarDatosDesdeSupabase();
+        alert(`¡Inventario actualizado correctamente para ${plato.name}! Stock actual: ${nuevoStockTotal}`);
+        await cargarDatosDesdeSupabase();
     }
 }
 
-// ==================== CARTA Y CONFIGURACIÓN EN BD ====================
+// ==================== CARTA Y CONFIGURACIÓN ====================
 async function toggleCartaFestiva(isFestivaParam) {
     isCartaFestiva = isFestivaParam;
     isFestiva = isCartaFestiva;
 
     const { error } = await db.from('configuracion').update({ carta_festiva: isFestivaParam }).eq('id', 1);
     if (error) {
-        alert('Error al actualizar el tipo de carta en la BD: ' + error.message);
+        alert('Error al actualizar la carta: ' + error.message);
         return;
     }
 
@@ -1142,41 +1198,6 @@ async function loadFinanzasData() {
         }
     } catch (err) {
         console.error("Error cargando finanzas:", err);
-    }
-}
-
-async function filtrarReportesPorFecha() {
-    const fechaInicio = document.getElementById('reporteFechaInicio').value;
-    const fechaFin = document.getElementById('reporteFechaFin').value;
-    const resultadoDiv = document.getElementById('reporteFiltradoResultado');
-
-    if (!fechaInicio || !fechaFin) {
-        alert('Por favor selecciona una fecha de inicio y fin.');
-        return;
-    }
-
-    try {
-        let query = db.from('comandas').select('*').eq('estado', 'cobrado');
-        
-        let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
-        let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
-
-        query = query.gte('created_at', inicioIso).lte('created_at', finIso);
-
-        const { data, error } = await query;
-        if (error) { resultadoDiv.innerHTML = `<p style="color:var(--accent-red);">Error al filtrar: ${error.message}</p>`; return; }
-
-        let totalRango = data.reduce((acc, c) => acc + parseFloat(c.total), 0);
-
-        resultadoDiv.innerHTML = `
-            <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:0.8rem; border:1px solid var(--border-color);">
-                <p><b>Período:</b> ${fechaInicio} al ${fechaFin}</p>
-                <p><b>Comandas cobradas:</b> ${data.length}</p>
-                <h4 style="color:var(--accent-green); margin-top:0.5rem;">Total Vendido: S/ ${totalRango.toFixed(2)}</h4>
-            </div>
-        `;
-    } catch (e) {
-        console.error("Error en reporte por fecha:", e);
     }
 }
 
@@ -1258,7 +1279,7 @@ async function cargarClientesAdmin() {
     }
 }
 
-// ==================== GESTIÓN DE USUARIOS (ADMIN) ====================
+// ==================== GESTIÓN DE USUARIOS ====================
 async function cargarUsuariosAdmin() {
     const tbody = document.getElementById('adminUsuariosTableBody');
     if (!tbody) return;
@@ -1436,7 +1457,6 @@ function renderAdminMesas() {
         });
     }
 
-    // Renderizar sección de pedidos activos en la pestaña Mesas del Admin
     const ordersContainer = document.getElementById('adminActiveOrdersContainer');
     if (!ordersContainer) return;
 
