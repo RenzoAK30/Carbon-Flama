@@ -13,7 +13,7 @@ let isFestiva = false;
 let tables = [];
 let dishes = [];
 let kitchenOrders = [];
-let activeClients = {};
+let activeClientNames = {}; // Almacena el nombre rápido asignado por mesa/comanda
 let systemUsers = [];
 
 let isJoinMode = false;
@@ -109,11 +109,19 @@ async function sincronizarComandasDesdeDB() {
             table: c.mesa,
             status: c.estado,
             total: parseFloat(c.total),
+            cliente_nombre: c.cliente_nombre || 'Sin nombre',
             cliente_dni: c.cliente_dni,
             time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             created_at: c.created_at,
             items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
+
+        // Sincronizar nombres rápidos en memoria por mesa
+        coms.forEach(c => {
+            if (c.estado !== 'cobrado' && c.cliente_nombre) {
+                activeClientNames[c.mesa] = c.cliente_nombre;
+            }
+        });
 
         tables.forEach(t => t.status = 'free');
         coms.forEach(c => {
@@ -419,11 +427,8 @@ function handleTableClick(tableName) {
     }
 
     const clientSpan = document.getElementById('assignedClientTag');
-    if (activeClients[selectedTable]) {
-        clientSpan.innerText = `${activeClients[selectedTable].name} (DNI: ${activeClients[selectedTable].dni})`;
-    } else {
-        clientSpan.innerText = 'Sin cliente';
-    }
+    const currentName = activeClientNames[selectedTable] || 'Sin nombre';
+    clientSpan.innerText = `Cliente: ${currentName}`;
 
     updateCartUI();
 }
@@ -480,9 +485,9 @@ async function confirmMoveTable() {
             return;
         }
 
-        if (activeClients[selectedTable]) {
-            activeClients[targetTable] = activeClients[selectedTable];
-            delete activeClients[selectedTable];
+        if (activeClientNames[selectedTable]) {
+            activeClientNames[targetTable] = activeClientNames[selectedTable];
+            delete activeClientNames[selectedTable];
         }
 
         alert(`¡Pedido trasladado exitosamente de ${selectedTable} a ${targetTable}!`);
@@ -494,73 +499,33 @@ async function confirmMoveTable() {
     }
 }
 
-// ==================== ASIGNAR CLIENTE & BÚSQUEDA POR NOMBRE ====================
-function openClientModal() {
-    document.getElementById('clientNameInput').value = '';
-    document.getElementById('clientDniInput').value = '';
-    document.getElementById('clientPhoneInput').value = '';
-    document.getElementById('clientModal').classList.remove('hidden');
+// ==================== NOMBRE RÁPIDO CLIENTE (MESERO) ====================
+function openQuickClientModal() {
+    document.getElementById('quickClientNameInput').value = activeClientNames[selectedTable] || '';
+    document.getElementById('clientQuickModal').classList.remove('hidden');
 }
 
-function closeClientModal() {
-    document.getElementById('clientModal').classList.add('hidden');
+function closeQuickClientModal() {
+    document.getElementById('clientQuickModal').classList.add('hidden');
 }
 
-async function buscarClientePorNombre() {
-    const nombreBuscado = document.getElementById('clientNameInput').value.trim();
-    if (!nombreBuscado) {
-        alert('Por favor ingresa un nombre para buscar.');
+async function confirmQuickClientName() {
+    const name = document.getElementById('quickClientNameInput').value.trim();
+    if (!name) {
+        alert('Por favor ingresa un nombre.');
         return;
     }
 
-    try {
-        const { data, error } = await db
-            .from('clientes')
-            .select('*')
-            .ilike('nombre', `%${nombreBuscado}%`)
-            .limit(1);
+    activeClientNames[selectedTable] = name;
+    document.getElementById('assignedClientTag').innerText = `Cliente: ${name}`;
 
-        if (error || !data || data.length === 0) {
-            alert('Cliente no encontrado en la base de datos con ese nombre. Por favor completa los datos manualmente.');
-            document.getElementById('clientDniInput').value = '';
-            document.getElementById('clientPhoneInput').value = '';
-            document.getElementById('clientDniInput').focus();
-        } else {
-            const cliente = data[0];
-            document.getElementById('clientNameInput').value = cliente.nombre || '';
-            document.getElementById('clientDniInput').value = cliente.dni || '';
-            document.getElementById('clientPhoneInput').value = cliente.telefono || '';
-            alert(`¡Cliente "${cliente.nombre}" encontrado y cargado con éxito!`);
-        }
-    } catch (err) {
-        console.error("Error al buscar cliente:", err);
-        alert('No se encontró el registro. Puedes llenarlo manualmente.');
+    // Actualizar en base de datos si ya existe comanda activa
+    let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
+    if (existingComanda) {
+        await db.from('comandas').update({ cliente_nombre: name }).eq('id', existingComanda.id);
     }
-}
 
-async function guardarClienteMesa(event) {
-    event.preventDefault();
-    const dni = document.getElementById('clientDniInput').value.trim();
-    const name = document.getElementById('clientNameInput').value.trim();
-    const phone = document.getElementById('clientPhoneInput').value.trim();
-
-    if (selectedTable && dni && name && phone) {
-        try {
-            const { error } = await db.from('clientes').upsert([{ dni, nombre: name, telefono: phone }], { onConflict: 'dni' });
-            if (error) {
-                alert('Error al guardar cliente en BD: ' + error.message);
-                return;
-            }
-
-            activeClients[selectedTable] = { dni, name, phone };
-            document.getElementById('assignedClientTag').innerText = `${name} (DNI: ${dni})`;
-            alert('Cliente asignado y guardado correctamente.');
-            closeClientModal();
-        } catch (e) {
-            console.error("Error guardando cliente:", e);
-            alert('Ocurrió un error al registrar el cliente.');
-        }
-    }
+    closeQuickClientModal();
 }
 
 function filterCategory(cat) { renderDishes(cat); }
@@ -735,9 +700,7 @@ async function enviarPedidoACocina() {
         }
     }
 
-    const clienteAsignado = activeClients[selectedTable];
-    const clienteDni = clienteAsignado ? clienteAsignado.dni : null;
-
+    const clienteNombre = activeClientNames[selectedTable] || 'Sin nombre';
     let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
 
     if (existingComanda) {
@@ -745,17 +708,14 @@ async function enviarPedidoACocina() {
         await db.from('items_comanda').insert(itemsIns);
 
         let nuevoTotalTotal = existingComanda.total + itemsAEnviar.reduce((acc, i) => acc + i.price, 0);
-        let updateData = { total: nuevoTotalTotal };
-        if (clienteDni) updateData.cliente_dni = clienteDni;
-
-        await db.from('comandas').update(updateData).eq('id', existingComanda.id);
+        await db.from('comandas').update({ total: nuevoTotalTotal, cliente_nombre: clienteNombre }).eq('id', existingComanda.id);
     } else {
         let totalMonto = itemsAEnviar.reduce((acc, i) => acc + i.price, 0);
         const { data: comRes, error: errC } = await db.from('comandas').insert([{ 
             mesa: selectedTable, 
             estado: 'pendiente', 
             total: totalMonto,
-            cliente_dni: clienteDni 
+            cliente_nombre: clienteNombre 
         }]).select();
 
         if (errC) { alert('Error: ' + errC.message); return; }
@@ -785,8 +745,8 @@ function renderKitchenView() {
         let itemsHtml = ord.items.map(i => `<li>${i.name}</li>`).join('');
         const cardHtml = `
             <div class="kds-ticket">
-                <h5>🍽️ ${ord.table}</h5>
-                <p>Hora: ${ord.time} ${ord.cliente_dni ? `| DNI: ${ord.cliente_dni}` : ''}</p>
+                <h5>🍽️ ${ord.table} - <span style="color:var(--accent-yellow);">${ord.cliente_nombre}</span></h5>
+                <p>Hora: ${ord.time}</p>
                 <ul>${itemsHtml}</ul>
                 <div style="margin-top: 0.8rem; display:flex; gap:0.5rem;">
                     ${ord.status === 'pendiente' ? `<button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${ord.id}, 'preparando')">Preparar ➔</button>` : ''}
@@ -824,7 +784,7 @@ function renderCajaView() {
         grid.innerHTML += `
             <div class="caja-ticket-card" onclick="openCajaModal(${ticket.id})">
                 <div class="ticket-header"><span>🍽️ ${ticket.table}</span></div>
-                <div class="ticket-time">Abierta ${ticket.time} | Ítems: ${ticket.items.length} ${ticket.cliente_dni ? `<br><small>DNI: ${ticket.cliente_dni}</small>` : ''}</div>
+                <div class="ticket-time"><b>Cliente:</b> ${ticket.cliente_nombre}<br>Abierta ${ticket.time} | Ítems: ${ticket.items.length}</div>
                 <div class="ticket-price">S/ ${ticket.total.toFixed(2)}</div>
             </div>
         `;
@@ -835,7 +795,13 @@ function openCajaModal(comandaId) {
     selectedComandaCaja = kitchenOrders.find(o => o.id === comandaId);
     if (!selectedComandaCaja) return;
 
-    document.getElementById('cajaModalTitle').innerText = `Detalle de Consumo - ${selectedComandaCaja.table}`;
+    document.getElementById('cajaModalTitle').innerText = `Detalle de Consumo - ${selectedComandaCaja.table} (${selectedComandaCaja.cliente_nombre})`;
+    
+    // Rellenar datos de caja por si ya los tuviera
+    document.getElementById('cajaClientDni').value = selectedComandaCaja.cliente_dni || '';
+    document.getElementById('cajaClientName').value = selectedComandaCaja.cliente_nombre !== 'Sin nombre' ? selectedComandaCaja.cliente_nombre : '';
+    document.getElementById('cajaClientPhone').value = '';
+
     const listContainer = document.getElementById('cajaItemsList');
     listContainer.innerHTML = '';
 
@@ -865,6 +831,21 @@ function calcularTotalCajaModal() {
     let sub = 0;
     checkboxes.forEach(chk => sub += parseFloat(chk.dataset.price));
     document.getElementById('cajaModalTotal').innerText = `S/ ${sub.toFixed(2)}`;
+}
+
+async function buscarClienteCajaPorDni() {
+    const dni = document.getElementById('cajaClientDni').value.trim();
+    if (dni.length === 8) {
+        try {
+            const { data, error } = await db.from('clientes').select('*').eq('dni', dni).single();
+            if (!error && data) {
+                document.getElementById('cajaClientName').value = data.nombre || '';
+                document.getElementById('cajaClientPhone').value = data.telefono || '';
+            }
+        } catch (e) {
+            console.error("Cliente no encontrado previamente, se registrará nuevo:", e);
+        }
+    }
 }
 
 // IMPRESIÓN DE PRECUENTA - TICKETERA TÉRMICA 80mm
@@ -909,7 +890,7 @@ function imprimirPrecuenta() {
             <div class="text-center">--- PRECUENTA ---</div>
             <br>
             <div><b>Mesa:</b> ${selectedComandaCaja.table}</div>
-            ${selectedComandaCaja.cliente_dni ? `<div><b>DNI Cliente:</b> ${selectedComandaCaja.cliente_dni}</div>` : ''}
+            <div><b>Cliente:</b> ${document.getElementById('cajaClientName').value || selectedComandaCaja.cliente_nombre}</div>
             <div><b>Fecha/Hora:</b> ${new Date().toLocaleString()}</div>
             <hr/>
             <div>
@@ -948,6 +929,18 @@ async function descontarStockPorItemsPagados(checkboxes) {
     }
 }
 
+async function registrarClienteEnBaseDatosCaja() {
+    const dni = document.getElementById('cajaClientDni').value.trim();
+    const nombre = document.getElementById('cajaClientName').value.trim();
+    const telefono = document.getElementById('cajaClientPhone').value.trim();
+
+    if (dni && nombre) {
+        await db.from('clientes').upsert([{ dni, nombre, telefono }], { onConflict: 'dni' });
+        return dni;
+    }
+    return null;
+}
+
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
     if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
@@ -955,6 +948,7 @@ async function cobrarSeleccionados() {
     const itemIdsToPay = Array.from(checkboxes).map(chk => parseInt(chk.value));
     let montoPagadoParcial = Array.from(checkboxes).reduce((acc, chk) => acc + parseFloat(chk.dataset.price), 0);
 
+    const dniRegistrado = await registrarClienteEnBaseDatosCaja();
     await descontarStockPorItemsPagados(checkboxes);
 
     for (let id of itemIdsToPay) {
@@ -963,8 +957,9 @@ async function cobrarSeleccionados() {
 
     const remainingItems = selectedComandaCaja.items.filter(i => !itemIdsToPay.includes(i.id));
     
-    if (selectedComandaCaja.cliente_dni) {
-        await actualizarConsumoCliente(selectedComandaCaja.cliente_dni, montoPagadoParcial);
+    if (dniRegistrado) {
+        await actualizarConsumoCliente(dniRegistrado, montoPagadoParcial);
+        await db.from('comandas').update({ cliente_dni: dniRegistrado }).eq('id', selectedComandaCaja.id);
     }
 
     if (remainingItems.length === 0) {
@@ -984,14 +979,15 @@ async function cobrarTodoYDesocupar() {
     if (!selectedComandaCaja) return;
 
     const checkboxes = document.querySelectorAll('.caja-item-chk');
+    const dniRegistrado = await registrarClienteEnBaseDatosCaja();
     await descontarStockPorItemsPagados(checkboxes);
 
     let montoTotalComanda = selectedComandaCaja.total;
-    if (selectedComandaCaja.cliente_dni) {
-        await actualizarConsumoCliente(selectedComandaCaja.cliente_dni, montoTotalComanda);
+    if (dniRegistrado) {
+        await actualizarConsumoCliente(dniRegistrado, montoTotalComanda);
     }
 
-    await db.from('comandas').update({ estado: 'cobrado' }).eq('id', selectedComandaCaja.id);
+    await db.from('comandas').update({ estado: 'cobrado', ...(dniRegistrado ? { cliente_dni: dniRegistrado } : {}) }).eq('id', selectedComandaCaja.id);
     await db.from('items_comanda').delete().eq('comanda_id', selectedComandaCaja.id);
 
     alert(`¡Mesa ${selectedComandaCaja.table} cobrada y liberada por completo!`);

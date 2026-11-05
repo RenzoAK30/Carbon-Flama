@@ -48,32 +48,19 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL ASIGNAR CLIENTE ==================== -->
-    <div id="clientModal" class="modal-overlay hidden">
+    <!-- ==================== MODAL RÁPIDO: SOLO NOMBRE CLIENTE (MESERO) ==================== -->
+    <div id="clientQuickModal" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>Asignar Cliente</h3>
-            <p class="text-muted">Busca por nombre o ingresa los datos del cliente.</p>
-            <form id="formCliente" onsubmit="guardarClienteMesa(event)">
-                <div class="form-group">
-                    <label>Nombre del Cliente</label>
-                    <div class="input-with-action">
-                        <input type="text" id="clientNameInput" placeholder="Nombre completo a buscar" required />
-                        <button type="button" class="btn btn-secondary" onclick="buscarClientePorNombre()" title="Buscar en base de datos">🔍</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>DNI</label>
-                    <input type="text" id="clientDniInput" placeholder="Número de DNI" maxlength="8" required />
-                </div>
-                <div class="form-group">
-                    <label>Celular</label>
-                    <input type="text" id="clientPhoneInput" placeholder="Número de celular" required />
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeClientModal()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Cliente</button>
-                </div>
-            </form>
+            <h3>Nombre del Cliente</h3>
+            <p class="text-muted">Ingresa el nombre para identificar el pedido rápidamente.</p>
+            <div class="form-group mt-3">
+                <label>Nombre o Alias:</label>
+                <input type="text" id="quickClientNameInput" placeholder="Ej: Juan Pérez" />
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeQuickClientModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmQuickClientName()">Guardar Nombre</button>
+            </div>
         </div>
     </div>
 
@@ -129,15 +116,25 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL DE DETALLE Y COBRO (CAJA) ==================== -->
+    <!-- ==================== MODAL DE DETALLE, COBRO Y DATOS CLIENTE (CAJA) ==================== -->
     <div id="cajaModal" class="modal-overlay hidden">
         <div class="modal-card modal-large">
             <div class="order-nav-header" style="margin-bottom:1rem;">
                 <h3 id="cajaModalTitle">Detalle de Consumo - Mesa</h3>
                 <button class="btn-secondary btn-sm" onclick="closeCajaModal()">✕ Cerrar</button>
             </div>
-            <p class="text-muted">Selecciona los ítems a cobrar (cuentas separadas) o emite una precuenta.</p>
+            <p class="text-muted">Completa los datos del cliente (DNI y Celular) para fidelización y selecciona los ítems a cobrar.</p>
             
+            <!-- Formulario de datos para la Base de Datos en Caja -->
+            <div style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin-bottom:1rem; border:1px solid var(--border-color);">
+                <h4 style="font-size:0.9rem; margin-bottom:0.5rem; color:var(--primary-color);">📋 Datos de Facturación / Cliente</h4>
+                <div class="form-row" style="margin-top:0;">
+                    <input type="text" id="cajaClientDni" placeholder="DNI (8 dígitos)" maxlength="8" onblur="buscarClienteCajaPorDni()" />
+                    <input type="text" id="cajaClientName" placeholder="Nombre del cliente" />
+                    <input type="text" id="cajaClientPhone" placeholder="Celular" />
+                </div>
+            </div>
+
             <div id="cajaItemsList" class="caja-detalle-items"></div>
 
             <div class="cart-summary mt-3">
@@ -188,8 +185,8 @@
                         <h2 id="currentOrderTitle">Mesa 1</h2>
                         <div class="order-client-action" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
                             <button class="btn btn-secondary btn-sm" onclick="openMoveTableModal()">🔄 Mover Mesa</button>
-                            <span id="assignedClientTag" class="loyalty-tag">Sin cliente</span>
-                            <button class="btn btn-secondary btn-sm" onclick="openClientModal()">+ Cliente</button>
+                            <span id="assignedClientTag" class="loyalty-tag">Cliente: Sin nombre</span>
+                            <button class="btn btn-secondary btn-sm" onclick="openQuickClientModal()">✏️ Nombre</button>
                         </div>
                     </div>
 
