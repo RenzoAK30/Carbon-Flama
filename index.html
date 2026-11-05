@@ -93,6 +93,42 @@
         </div>
     </div>
 
+    <!-- ==================== MODAL EDITAR USUARIO ==================== -->
+    <div id="editUserModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Editar Usuario</h3>
+            <form id="formEditUser" onsubmit="actualizarUsuarioTrabajador(event)">
+                <input type="hidden" id="editUsrId" />
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="editUsrUser" required />
+                </div>
+                <div class="form-group">
+                    <label>Nombre completo</label>
+                    <input type="text" id="editUsrNombre" required />
+                </div>
+                <div class="form-group">
+                    <label>Contraseña (dejar en blanco para mantener)</label>
+                    <input type="password" id="editUsrPass" placeholder="••••••••" />
+                </div>
+                <div class="form-group">
+                    <label>Rol</label>
+                    <select id="editUsrRol">
+                        <option value="mesero">Mesero</option>
+                        <option value="cocina">Cocina</option>
+                        <option value="caja">Caja</option>
+                        <option value="almacen">Almacén</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- ==================== MODAL DE DETALLE Y COBRO (CAJA) ==================== -->
     <div id="cajaModal" class="modal-overlay hidden">
         <div class="modal-card modal-large">
@@ -393,6 +429,26 @@
                             <div class="form-group"><label>Rol</label><select id="usrRol"><option value="mesero">Mesero</option><option value="cocina">Cocina</option><option value="caja">Caja</option><option value="almacen">Almacén</option><option value="admin">Administrador</option></select></div>
                             <button type="submit" class="btn btn-primary btn-block">+ Crear cuenta</button>
                         </form>
+                    </div>
+
+                    <div class="form-card mt-3">
+                        <h3>Lista de Trabajadores y Accesos</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre Completo</th>
+                                        <th>Rol</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminUsuariosTableBody">
+                                    <tr><td colspan="5">Cargando usuarios...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div id="adminTab-ajustes" class="admin-tab-pane"><div class="form-card"><h3>Ajustes de Impresoras</h3></div></div>

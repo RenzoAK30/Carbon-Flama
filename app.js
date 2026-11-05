@@ -14,6 +14,7 @@ let tables = [];
 let dishes = [];
 let kitchenOrders = [];
 let activeClients = {};
+let systemUsers = [];
 
 let isJoinMode = false;
 let tablesToJoin = [];
@@ -49,6 +50,8 @@ function configurarSupabaseRealtime() {
               if (chk) chk.checked = isCartaFestiva;
               actualizarInterfazCartaVisual();
               renderDishes('Todas');
+          } else if (payload.table === 'usuarios') {
+              cargarUsuariosAdmin();
           } else {
               sincronizarComandasDesdeDB();
           }
@@ -92,6 +95,7 @@ async function cargarDatosDesdeSupabase() {
         renderAdminMesas();
         renderAlmacenView();
         cargarClientesAdmin();
+        cargarUsuariosAdmin();
     } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
     }
@@ -180,6 +184,7 @@ function switchRoleView(role) {
         if (role === 'admin') {
             loadFinanzasData();
             cargarClientesAdmin();
+            cargarUsuariosAdmin();
         }
     } else {
         document.getElementById('view-mesero').classList.add('active');
@@ -192,6 +197,7 @@ function switchAdminTab(tabName, event) {
     if (event) event.currentTarget.classList.add('active');
     document.getElementById(`adminTab-${tabName}`).classList.add('active');
     if (tabName === 'clientes') cargarClientesAdmin();
+    if (tabName === 'usuarios') cargarUsuariosAdmin();
 }
 
 // ==================== REPORTE DE BEBIDAS Y UTILIDAD ====================
@@ -249,7 +255,8 @@ async function generarReporteGaseosas() {
         comandas.forEach(c => {
             if (c.items_comanda) {
                 c.items_comanda.forEach(item => {
-                    let bebidaEncontrada = bebidasCatalogo.find(b => item.nombre_plato.toLowerCase().includes(b.name.toLowerCase()));
+                    let nombreItemLimpio = item.nombre_plato.toLowerCase();
+                    let bebidaEncontrada = bebidasCatalogo.find(b => nombreItemLimpio.includes(b.name.toLowerCase()));
                     if (bebidaEncontrada) {
                         let nombre = bebidaEncontrada.name;
                         resumenBebidas[nombre].cantidadVendida += 1;
@@ -1255,6 +1262,127 @@ async function cargarClientesAdmin() {
     }
 }
 
+// ==================== GESTIÓN DE USUARIOS (ADMIN) ====================
+async function cargarUsuariosAdmin() {
+    const tbody = document.getElementById('adminUsuariosTableBody');
+    if (!tbody) return;
+
+    try {
+        const { data, error } = await db.from('usuarios').select('*');
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:var(--accent-red);">Error al cargar usuarios.</td></tr>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5">No hay usuarios registrados.</td></tr>`;
+            return;
+        }
+
+        systemUsers = data;
+        tbody.innerHTML = '';
+        data.forEach(u => {
+            let estadoBadge = u.activo 
+                ? `<span style="color:var(--accent-green); font-weight:600;">Activo</span>` 
+                : `<span style="color:var(--accent-red); font-weight:600;">Desactivado</span>`;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><b>${u.usuario}</b></td>
+                    <td>${u.nombre_completo}</td>
+                    <td><span class="loyalty-tag">${u.rol.toUpperCase()}</span></td>
+                    <td>${estadoBadge}</td>
+                    <td>
+                        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="abrirEditarUsuario(${u.id})">✏️ Editar</button>
+                            <button class="btn ${u.activo ? 'btn-secondary' : 'btn-success'} btn-sm" onclick="toggleEstadoUsuario(${u.id}, ${!u.activo})">${u.activo ? '🚫 Desactivar' : '✅ Activar'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarUsuario(${u.id})" style="background:var(--accent-red); color:#fff;">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (e) {
+        console.error("Error cargando usuarios:", e);
+    }
+}
+
+async function crearUsuarioTrabajador(e) {
+    e.preventDefault();
+    const usuario = document.getElementById('usrUser').value.trim();
+    const nombre_completo = document.getElementById('usrNombre').value.trim();
+    const password = document.getElementById('usrPass').value.trim();
+    const rol = document.getElementById('usrRol').value;
+
+    const { error } = await db.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
+    if (error) { 
+        alert('Error al crear usuario: ' + error.message); 
+    } else {
+        alert('¡Trabajador creado con éxito!');
+        e.target.reset();
+        cargarUsuariosAdmin();
+    }
+}
+
+function abrirEditarUsuario(id) {
+    const user = systemUsers.find(u => u.id === id);
+    if (!user) return;
+
+    document.getElementById('editUsrId').value = user.id;
+    document.getElementById('editUsrUser').value = user.usuario;
+    document.getElementById('editUsrNombre').value = user.nombre_completo;
+    document.getElementById('editUsrPass').value = '';
+    document.getElementById('editUsrRol').value = user.rol;
+
+    document.getElementById('editUserModal').classList.remove('hidden');
+}
+
+function closeEditUserModal() {
+    document.getElementById('editUserModal').classList.add('hidden');
+}
+
+async function actualizarUsuarioTrabajador(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('editUsrId').value);
+    const usuario = document.getElementById('editUsrUser').value.trim();
+    const nombre_completo = document.getElementById('editUsrNombre').value.trim();
+    const password = document.getElementById('editUsrPass').value.trim();
+    const rol = document.getElementById('editUsrRol').value;
+
+    let updateData = { usuario, nombre_completo, rol };
+    if (password) updateData.password = password;
+
+    const { error } = await db.from('usuarios').update(updateData).eq('id', id);
+    if (error) {
+        alert('Error al actualizar usuario: ' + error.message);
+    } else {
+        alert('¡Usuario actualizado correctamente!');
+        closeEditUserModal();
+        cargarUsuariosAdmin();
+    }
+}
+
+async function toggleEstadoUsuario(id, nuevoEstado) {
+    const { error } = await db.from('usuarios').update({ activo: nuevoEstado }).eq('id', id);
+    if (error) {
+        alert('Error al cambiar estado: ' + error.message);
+    } else {
+        cargarUsuariosAdmin();
+    }
+}
+
+async function eliminarUsuario(id) {
+    if (!confirm('¿Estás seguro de eliminar permanentemente este usuario?')) return;
+
+    const { error } = await db.from('usuarios').delete().eq('id', id);
+    if (error) {
+        alert('Error al eliminar usuario: ' + error.message);
+    } else {
+        alert('Usuario eliminado correctamente.');
+        cargarUsuariosAdmin();
+    }
+}
+
 async function agregarPlato(event) {
     event.preventDefault();
     const nombre = document.getElementById('platoNombre').value;
@@ -1325,18 +1453,4 @@ async function agregarMesaSalon() {
 async function eliminarMesa(id) {
     await db.from('mesas').delete().eq('id', id);
     cargarDatosDesdeSupabase();
-}
-
-async function crearUsuarioTrabajador(e) {
-    e.preventDefault();
-    const usuario = document.getElementById('usrUser').value;
-    const nombre_completo = document.getElementById('usrNombre').value;
-    const password = document.getElementById('usrPass').value;
-    const rol = document.getElementById('usrRol').value;
-
-    const { error } = await db.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
-    if (error) { alert('Error: ' + error.message); } else {
-        alert('Trabajador creado con éxito.');
-        e.target.reset();
-    }
 }
