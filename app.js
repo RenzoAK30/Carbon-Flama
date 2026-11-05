@@ -237,19 +237,37 @@ async function filtrarReportesPorFecha() {
                 <h4 style="color:var(--accent-green); margin:0.5rem 0 1rem 0;">Total Vendido: S/ ${totalRango.toFixed(2)}</h4>
                 
                 <h5>Desglose Detallado de Comandas:</h5>
-                <div style="max-height: 300px; overflow-y:auto; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+                <div style="max-height: 350px; overflow-y:auto; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.6rem;">
         `;
 
         if (data.length === 0) {
             detalleHtml += `<p class="text-muted">No hay comandas cobradas en este rango.</p>`;
         } else {
             data.forEach(c => {
-                let itemsList = c.items_comanda ? c.items_comanda.map(i => `${i.nombre_plato} (S/ ${parseFloat(i.precio).toFixed(2)})`).join(', ') : 'Sin ítems';
+                // Si items_comanda está vacío porque se cobró todo, intentamos buscarlo en la memoria global kitchenOrders o mostramos el total cobrado
+                let itemsStr = '';
+                if (c.items_comanda && c.items_comanda.length > 0) {
+                    itemsStr = c.items_comanda.map(i => `${i.nombre_plato} (S/ ${parseFloat(i.precio).toFixed(2)})`).join(', ');
+                } else {
+                    // Buscar respaldo histórico en memoria si ya fue eliminado de la BD
+                    let ordenMemoria = kitchenOrders.find(o => o.id === c.id);
+                    if (ordenMemoria && ordenMemoria.items && ordenMemoria.items.length > 0) {
+                        itemsStr = ordenMemoria.items.map(i => `${i.name} (S/ ${parseFloat(i.price).toFixed(2)})`).join(', ');
+                    } else {
+                        itemsStr = `<span class="text-muted">Consumo registrado por S/ ${parseFloat(c.total).toFixed(2)} (Pago total procesado)</span>`;
+                    }
+                }
+
                 detalleHtml += `
-                    <div style="background:#2b2d42; padding:0.6rem; border-radius:6px; font-size:0.85rem; border:1px solid var(--border-color);">
-                        <b>Mesa/Llevar:</b> ${c.mesa} | <b>Cliente:</b> ${c.cliente_nombre || 'Sin nombre'} | <b>Hora:</b> ${new Date(c.created_at).toLocaleTimeString()}<br>
-                        <b>Ítems:</b> ${itemsList}<br>
-                        <span style="color:var(--primary-color); font-weight:600;">Total Comanda: S/ ${parseFloat(c.total).toFixed(2)}</span>
+                    <div style="background:#2b2d42; padding:0.8rem; border-radius:6px; font-size:0.85rem; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+                            <span><b>Mesa/Llevar:</b> ${c.mesa} | <b>Cliente:</b> ${c.cliente_nombre || 'Sin nombre'}</span>
+                            <span class="text-muted">${new Date(c.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div><b>Ítems Consumidos:</b> ${itemsStr}</div>
+                        <div style="margin-top:0.4rem; text-align:right;">
+                            <span style="color:var(--primary-color); font-weight:600;">Total Comanda: S/ ${parseFloat(c.total).toFixed(2)}</span>
+                        </div>
                     </div>
                 `;
             });
