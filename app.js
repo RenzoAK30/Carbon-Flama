@@ -13,7 +13,7 @@ let isFestiva = false;
 let tables = [];
 let dishes = [];
 let kitchenOrders = [];
-let activeClientNames = {}; // Almacena el nombre rápido asignado por mesa/comanda
+let activeClientNames = {}; 
 let systemUsers = [];
 
 let isJoinMode = false;
@@ -116,7 +116,6 @@ async function sincronizarComandasDesdeDB() {
             items: c.items_comanda.map(i => ({ id: i.id, name: i.nombre_plato, price: parseFloat(i.precio) }))
         }));
 
-        // Sincronizar nombres rápidos en memoria por mesa
         coms.forEach(c => {
             if (c.estado !== 'cobrado' && c.cliente_nombre) {
                 activeClientNames[c.mesa] = c.cliente_nombre;
@@ -135,6 +134,7 @@ async function sincronizarComandasDesdeDB() {
     renderKitchenView();
     renderTables();
     renderAlmacenView();
+    renderAdminMesas(); // Actualiza la vista de mesas y pedidos del Admin
     loadFinanzasData();
     cargarClientesAdmin();
 }
@@ -193,6 +193,7 @@ function switchRoleView(role) {
             loadFinanzasData();
             cargarClientesAdmin();
             cargarUsuariosAdmin();
+            renderAdminMesas();
         }
     } else {
         document.getElementById('view-mesero').classList.add('active');
@@ -206,6 +207,7 @@ function switchAdminTab(tabName, event) {
     document.getElementById(`adminTab-${tabName}`).classList.add('active');
     if (tabName === 'clientes') cargarClientesAdmin();
     if (tabName === 'usuarios') cargarUsuariosAdmin();
+    if (tabName === 'mesas') renderAdminMesas();
 }
 
 // ==================== REPORTE DE BEBIDAS Y UTILIDAD ====================
@@ -519,7 +521,6 @@ async function confirmQuickClientName() {
     activeClientNames[selectedTable] = name;
     document.getElementById('assignedClientTag').innerText = `Cliente: ${name}`;
 
-    // Actualizar en base de datos si ya existe comanda activa
     let existingComanda = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
     if (existingComanda) {
         await db.from('comandas').update({ cliente_nombre: name }).eq('id', existingComanda.id);
@@ -630,7 +631,7 @@ function updateCartUI() {
                     <span>${item.name} - S/ ${item.price.toFixed(2)} ${isNew ? '<span style="color:var(--accent-green); font-size:0.7rem;">(Nuevo)</span>' : ''}</span>
                     <div style="display:flex; gap:0.3rem; align-items:center;">
                         ${isNew ? `<button class="btn btn-secondary btn-sm" onclick="tempOrderCart.splice(${index - (existingOrder ? existingOrder.items.length : 0)},1); updateCartUI();" style="padding:0.1rem 0.4rem; font-size:0.7rem;">✕</button>` : ''}
-                        ${!isNew ? `<button class="btn btn-danger btn-sm" onclick="eliminarItemComandaSeguro(${existingOrder.id}, ${item.id})" title="Eliminar plato (Solo Admin)" style="padding:0.1rem 0.4rem; font-size:0.7rem; background:var(--accent-red); color:#fff;">🗑️</button>` : ''}
+                        ${!isNew ? `<button class="btn btn-danger btn-sm" onclick="eliminarItemComandaSeguro(${existingOrder.id}, ${item.id})" title="Eliminar plato" style="padding:0.1rem 0.4rem; font-size:0.7rem; background:var(--accent-red); color:#fff;">🗑️</button>` : ''}
                     </div>
                 </div>
             `;
@@ -651,10 +652,10 @@ function updateCartUI() {
     document.getElementById('cartTotal').innerText = `S/ ${totalSub.toFixed(2)}`;
 }
 
-// ==================== ELIMINAR ÍTEM CON RESTRICCIÓN DE ADMIN ====================
+// ==================== ELIMINAR ÍTEM (ADMIN / SEGURIDAD) ====================
 async function eliminarItemComandaSeguro(comandaId, itemId) {
-    if (!currentUserProfile || currentUserProfile.rol !== 'admin') {
-        alert('⚠️ ACCESO DENEGADO: Solo el Administrador puede eliminar platos de una comanda ya enviada a cocina.');
+    if (!currentUserProfile || (currentUserProfile.rol !== 'admin' && currentUserProfile.rol !== 'mesero')) {
+        alert('⚠️ No tienes permisos para eliminar ítems.');
         return;
     }
 
@@ -797,7 +798,6 @@ function openCajaModal(comandaId) {
 
     document.getElementById('cajaModalTitle').innerText = `Detalle de Consumo - ${selectedComandaCaja.table} (${selectedComandaCaja.cliente_nombre})`;
     
-    // Rellenar datos de caja por si ya los tuviera
     document.getElementById('cajaClientDni').value = selectedComandaCaja.cliente_dni || '';
     document.getElementById('cajaClientName').value = selectedComandaCaja.cliente_nombre !== 'Sin nombre' ? selectedComandaCaja.cliente_nombre : '';
     document.getElementById('cajaClientPhone').value = '';
@@ -843,7 +843,7 @@ async function buscarClienteCajaPorDni() {
                 document.getElementById('cajaClientPhone').value = data.telefono || '';
             }
         } catch (e) {
-            console.error("Cliente no encontrado previamente, se registrará nuevo:", e);
+            console.error("Cliente no encontrado previamente:", e);
         }
     }
 }
@@ -1435,6 +1435,38 @@ function renderAdminMesas() {
             grid.innerHTML += `<div class="table-card"><h4>${t.name}</h4><button class="btn btn-secondary btn-sm" onclick="eliminarMesa(${t.id})">🗑️</button></div>`;
         });
     }
+
+    // Renderizar sección de pedidos activos en la pestaña Mesas del Admin
+    const ordersContainer = document.getElementById('adminActiveOrdersContainer');
+    if (!ordersContainer) return;
+
+    const activeOrders = kitchenOrders.filter(o => o.status !== 'cobrado');
+    if (activeOrders.length === 0) {
+        ordersContainer.innerHTML = `<p class="text-muted">No hay pedidos o mesas ocupadas en este momento.</p>`;
+        return;
+    }
+
+    ordersContainer.innerHTML = '';
+    activeOrders.forEach(ord => {
+        let itemsHtml = ord.items.map(i => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#1e1e24; padding:0.4rem 0.8rem; border-radius:6px; margin-bottom:0.3rem; font-size:0.85rem;">
+                <span>${i.name} - <b>S/ ${i.price.toFixed(2)}</b></span>
+                <button class="btn btn-danger btn-sm" onclick="eliminarItemComandaSeguro(${ord.id}, ${i.id})" style="padding:0.1rem 0.4rem; font-size:0.7rem; background:var(--accent-red); color:#fff;" title="Eliminar ítem">🗑️</button>
+            </div>
+        `).join('');
+
+        ordersContainer.innerHTML += `
+            <div style="background:#2b2d42; border:1px solid var(--border-color); border-radius:8px; padding:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                    <h4 style="color:var(--primary-color);">🍽️ ${ord.table} <span style="font-size:0.85rem; color:var(--accent-yellow);">(${ord.cliente_nombre})</span></h4>
+                    <span style="font-size:0.85rem;" class="loyalty-tag">Estado: ${ord.status.toUpperCase()} | Total: S/ ${ord.total.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    });
 }
 
 async function agregarMesaSalon() {

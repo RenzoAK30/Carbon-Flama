@@ -125,7 +125,6 @@
             </div>
             <p class="text-muted">Completa los datos del cliente (DNI y Celular) para fidelización y selecciona los ítems a cobrar.</p>
             
-            <!-- Formulario de datos para la Base de Datos en Caja -->
             <div style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin-bottom:1rem; border:1px solid var(--border-color);">
                 <h4 style="font-size:0.9rem; margin-bottom:0.5rem; color:var(--primary-color);">📋 Datos de Facturación / Cliente</h4>
                 <div class="form-row" style="margin-top:0;">
@@ -290,7 +289,7 @@
                     <button class="admin-tab-btn" onclick="switchAdminTab('menu', event)">Menú</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('clientes', event)">Clientes & Consumos</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('recompensas', event)">Recompensas</button>
-                    <button class="admin-tab-btn" onclick="switchAdminTab('mesas', event)">Mesas</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('mesas', event)">Mesas & Pedidos</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('usuarios', event)">Usuarios</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('ajustes', event)">Ajustes</button>
                 </div>
@@ -409,13 +408,24 @@
                 </div>
 
                 <div id="adminTab-recompensas" class="admin-tab-pane"><div class="form-card"><h3>Recompensas</h3></div></div>
+                
+                <!-- PESTAÑA ADMIN: MESAS Y PEDIDOS ACTIVOS -->
                 <div id="adminTab-mesas" class="admin-tab-pane">
                     <div class="form-card">
-                        <h3>Mesas del salón</h3>
-                        <div class="form-row"><input type="number" id="nuevaMesaNum" placeholder="Número de mesa" /><button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar</button></div>
+                        <h3>Gestión de Mesas del Salón</h3>
+                        <div class="form-row"><input type="number" id="nuevaMesaNum" placeholder="Número de mesa" /><button class="btn btn-primary" onclick="agregarMesaSalon()">+ Agregar Mesa</button></div>
                         <div class="admin-tables-grid" id="adminTablesGrid"></div>
                     </div>
+
+                    <div class="form-card mt-3">
+                        <h3>📋 Pedidos Activos y Supervisión en Tiempo Real</h3>
+                        <p class="text-muted">Visualiza el contenido de las mesas o pedidos para llevar activos y elimina ítems si es necesario.</p>
+                        <div id="adminActiveOrdersContainer" class="mt-3" style="display:flex; flex-direction:column; gap:1rem;">
+                            <p class="text-muted">No hay pedidos activos.</p>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="adminTab-usuarios" class="admin-tab-pane">
                     <div class="form-card">
                         <h3>Crear cuenta de trabajador</h3>
