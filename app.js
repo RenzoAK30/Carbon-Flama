@@ -210,7 +210,7 @@ function switchAdminTab(tabName, event) {
     if (tabName === 'mesas') renderAdminMesas();
 }
 
-// ==================== REPORTE DETALLADO DE VENTAS ====================
+// ==================== REPORTE DETALLADO DE VENTAS USANDO HISTORIAL ====================
 async function filtrarReportesPorFecha() {
     const fechaInicio = document.getElementById('reporteFechaInicio').value;
     const fechaFin = document.getElementById('reporteFechaFin').value;
@@ -225,37 +225,34 @@ async function filtrarReportesPorFecha() {
         let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
         let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
 
-        const { data, error } = await db.from('comandas').select('*, items_comanda(*)').eq('estado', 'cobrado').gte('created_at', inicioIso).lte('created_at', finIso);
-        if (error) { resultadoDiv.innerHTML = `<p style="color:var(--accent-red);">Error al filtrar: ${error.message}</p>`; return; }
+        const { data: comandasData, error: errCom } = await db.from('comandas').select('*').eq('estado', 'cobrado').gte('created_at', inicioIso).lte('created_at', finIso);
+        if (errCom) { resultadoDiv.innerHTML = `<p style="color:var(--accent-red);">Error al filtrar: ${errCom.message}</p>`; return; }
 
-        let totalRango = data.reduce((acc, c) => acc + parseFloat(c.total), 0);
+        const { data: historialData, error: errHist } = await db.from('historial_items_cobrados').select('*').gte('created_at', inicioIso).lte('created_at', finIso);
+
+        let totalRango = comandasData.reduce((acc, c) => acc + parseFloat(c.total), 0);
 
         let detalleHtml = `
             <div style="background:#1e1e24; padding:1rem; border-radius:8px; margin-top:0.8rem; border:1px solid var(--border-color);">
                 <p><b>Período:</b> ${fechaInicio} al ${fechaFin}</p>
-                <p><b>Total Comandas Cobradas:</b> ${data.length}</p>
+                <p><b>Total Comandas Cobradas:</b> ${comandasData.length}</p>
                 <h4 style="color:var(--accent-green); margin:0.5rem 0 1rem 0;">Total Vendido: S/ ${totalRango.toFixed(2)}</h4>
                 
                 <h5>Desglose Detallado de Comandas:</h5>
-                <div style="max-height: 350px; overflow-y:auto; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.6rem;">
+                <div style="max-height: 380px; overflow-y:auto; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.6rem;">
         `;
 
-        if (data.length === 0) {
+        if (comandasData.length === 0) {
             detalleHtml += `<p class="text-muted">No hay comandas cobradas en este rango.</p>`;
         } else {
-            data.forEach(c => {
-                // Si items_comanda está vacío porque se cobró todo, intentamos buscarlo en la memoria global kitchenOrders o mostramos el total cobrado
+            comandasData.forEach(c => {
+                let itemsEstaComanda = historialData ? historialData.filter(h => h.comanda_id === c.id) : [];
                 let itemsStr = '';
-                if (c.items_comanda && c.items_comanda.length > 0) {
-                    itemsStr = c.items_comanda.map(i => `${i.nombre_plato} (S/ ${parseFloat(i.precio).toFixed(2)})`).join(', ');
+
+                if (itemsEstaComanda.length > 0) {
+                    itemsStr = itemsEstaComanda.map(i => `${i.nombre_plato} (S/ ${parseFloat(i.precio).toFixed(2)})`).join(', ');
                 } else {
-                    // Buscar respaldo histórico en memoria si ya fue eliminado de la BD
-                    let ordenMemoria = kitchenOrders.find(o => o.id === c.id);
-                    if (ordenMemoria && ordenMemoria.items && ordenMemoria.items.length > 0) {
-                        itemsStr = ordenMemoria.items.map(i => `${i.name} (S/ ${parseFloat(i.price).toFixed(2)})`).join(', ');
-                    } else {
-                        itemsStr = `<span class="text-muted">Consumo registrado por S/ ${parseFloat(c.total).toFixed(2)} (Pago total procesado)</span>`;
-                    }
+                    itemsStr = `<span class="text-muted">Sin detalle registrado previamente (comanda anterior al respaldo histórico)</span>`;
                 }
 
                 detalleHtml += `
@@ -297,10 +294,9 @@ async function generarReporteGaseosas() {
         let inicioIso = new Date(fechaInicio + 'T00:00:00').toISOString();
         let finIso = new Date(fechaFin + 'T23:59:59').toISOString();
 
-        const { data: comandas, error } = await db
-            .from('comandas')
-            .select('*, items_comanda(*)')
-            .eq('estado', 'cobrado')
+        const { data: historialData, error } = await db
+            .from('historial_items_cobrados')
+            .select('*')
             .gte('created_at', inicioIso)
             .lte('created_at', finIso);
 
@@ -309,8 +305,8 @@ async function generarReporteGaseosas() {
             return;
         }
 
-        if (!comandas || comandas.length === 0) {
-            contenedor.innerHTML = `<p class="text-muted">No se registraron ventas en el rango de fechas seleccionado.</p>`;
+        if (!historialData || historialData.length === 0) {
+            contenedor.innerHTML = `<p class="text-muted">No se registraron ventas de bebidas en el rango de fechas seleccionado.</p>`;
             return;
         }
 
@@ -332,20 +328,16 @@ async function generarReporteGaseosas() {
             };
         });
 
-        comandas.forEach(c => {
-            if (c.items_comanda) {
-                c.items_comanda.forEach(item => {
-                    let nombreItemLimpio = item.nombre_plato.toLowerCase();
-                    bebidasCatalogo.forEach(b => {
-                        if (nombreItemLimpio.includes(b.name.toLowerCase())) {
-                            resumenBebidas[b.name].cantidadVendida += 1;
-                            resumenBebidas[b.name].ingresoTotal += parseFloat(item.precio || 0);
-                            resumenBebidas[b.name].costoTotal += parseFloat(b.costo || 0);
-                            resumenBebidas[b.name].utilidadTotal += (parseFloat(item.precio || 0) - parseFloat(b.costo || 0));
-                        }
-                    });
-                });
-            }
+        historialData.forEach(item => {
+            let nombreItemLimpio = item.nombre_plato.toLowerCase();
+            bebidasCatalogo.forEach(b => {
+                if (nombreItemLimpio.includes(b.name.toLowerCase())) {
+                    resumenBebidas[b.name].cantidadVendida += 1;
+                    resumenBebidas[b.name].ingresoTotal += parseFloat(item.precio || 0);
+                    resumenBebidas[b.name].costoTotal += parseFloat(b.costo || 0);
+                    resumenBebidas[b.name].utilidadTotal += (parseFloat(item.precio || 0) - parseFloat(b.costo || 0));
+                }
+            });
         });
 
         let htmlTabla = `
@@ -998,6 +990,7 @@ async function registrarClienteEnBaseDatosCaja() {
     return null;
 }
 
+// ==================== COBRO PARCIAL CON RESPALDO HISTÓRICO ====================
 async function cobrarSeleccionados() {
     const checkboxes = document.querySelectorAll('.caja-item-chk:checked');
     if (checkboxes.length === 0) { alert('Selecciona al menos un ítem.'); return; }
@@ -1007,6 +1000,25 @@ async function cobrarSeleccionados() {
 
     const dniRegistrado = await registrarClienteEnBaseDatosCaja();
     await descontarStockPorItemsPagados(checkboxes);
+
+    let itemsHistoricos = [];
+    checkboxes.forEach(chk => {
+        let itemId = parseInt(chk.value);
+        let found = selectedComandaCaja.items.find(i => i.id === itemId);
+        if (found) {
+            itemsHistoricos.push({
+                comanda_id: selectedComandaCaja.id,
+                mesa: selectedComandaCaja.table,
+                cliente_nombre: document.getElementById('cajaClientName').value || selectedComandaCaja.cliente_nombre,
+                nombre_plato: found.name,
+                precio: found.price
+            });
+        }
+    });
+
+    if (itemsHistoricos.length > 0) {
+        await db.from('historial_items_cobrados').insert(itemsHistoricos);
+    }
 
     for (let id of itemIdsToPay) {
         await db.from('items_comanda').delete().eq('id', id);
@@ -1032,12 +1044,25 @@ async function cobrarSeleccionados() {
     await sincronizarComandasDesdeDB();
 }
 
+// ==================== COBRO TOTAL CON RESPALDO HISTÓRICO ====================
 async function cobrarTodoYDesocupar() {
     if (!selectedComandaCaja) return;
 
     const checkboxes = document.querySelectorAll('.caja-item-chk');
     const dniRegistrado = await registrarClienteEnBaseDatosCaja();
     await descontarStockPorItemsPagados(checkboxes);
+
+    let itemsHistoricos = selectedComandaCaja.items.map(i => ({
+        comanda_id: selectedComandaCaja.id,
+        mesa: selectedComandaCaja.table,
+        cliente_nombre: document.getElementById('cajaClientName').value || selectedComandaCaja.cliente_nombre,
+        nombre_plato: i.name,
+        precio: i.price
+    }));
+
+    if (itemsHistoricos.length > 0) {
+        await db.from('historial_items_cobrados').insert(itemsHistoricos);
+    }
 
     let montoTotalComanda = selectedComandaCaja.total;
     if (dniRegistrado) {
@@ -1069,7 +1094,6 @@ function renderAlmacenView() {
     const tbody = document.getElementById('almacenTableBody');
     if (!tbody) return;
 
-    // Filtrar estrictamente solo Bebidas y materias primas solicitadas
     const insumosPermitidos = ['chuleta', 'marucha', 'tira', 'chorizo', 'hotdog', 'cecina'];
     const productosAlmacen = dishes.filter(d => {
         let cat = (d.category || '').toLowerCase();
@@ -1177,20 +1201,20 @@ async function registrarGasto(event) {
 
 async function loadFinanzasData() {
     try {
-        const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*, items_comanda(*)').eq('estado', 'cobrado');
+        const { data: comandasCobradas, error: errC } = await db.from('comandas').select('*').eq('estado', 'cobrado');
+        const { data: historialItems, error: errH } = await db.from('historial_items_cobrados').select('*');
         let totalVentas = 0;
         let costoVentas = 0;
 
         if (!errC && comandasCobradas) {
-            comandasCobradas.forEach(c => {
-                totalVentas += (parseFloat(c.total) || 0);
-                if (c.items_comanda) {
-                    c.items_comanda.forEach(item => {
-                        let platoMatch = dishes.find(d => item.nombre_plato.includes(d.name));
-                        if (platoMatch) {
-                            costoVentas += (platoMatch.costo || 0);
-                        }
-                    });
+            totalVentas = comandasCobradas.reduce((acc, c) => acc + (parseFloat(c.total) || 0), 0);
+        }
+
+        if (!errH && historialItems) {
+            historialItems.forEach(item => {
+                let platoMatch = dishes.find(d => item.nombre_plato.toLowerCase().includes(d.name.toLowerCase()));
+                if (platoMatch) {
+                    costoVentas += (platoMatch.costo || 0);
                 }
             });
         }
@@ -1235,16 +1259,14 @@ async function buscarHistorialCliente() {
             return;
         }
 
-        const { data: comandasCliente, error: errCom } = await db.from('comandas').select('*, items_comanda(*)').eq('cliente_dni', dni);
+        const { data: comandasCliente, error: errCom } = await db.from('comandas').select('*').eq('cliente_dni', dni);
 
         let historialHtml = '';
         if (comandasCliente && comandasCliente.length > 0) {
             comandasCliente.forEach(c => {
-                let itemsStr = c.items_comanda.map(i => `${i.nombre_plato} (S/ ${i.precio})`).join(', ');
                 historialHtml += `
                     <div style="background:#1e1e24; padding:0.6rem; border-radius:6px; margin-bottom:0.5rem; font-size:0.85rem;">
                         <b>Mesa/Llevar:</b> ${c.mesa} | <b>Fecha:</b> ${new Date(c.created_at).toLocaleString()} | <b>Estado:</b> ${c.estado}<br>
-                        <b>Ítems:</b> ${itemsStr}<br>
                         <strong style="color:var(--primary-color);">Total: S/ ${parseFloat(c.total).toFixed(2)}</strong>
                     </div>
                 `;
