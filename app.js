@@ -632,7 +632,7 @@ function openModModal(dish) {
     } else if (dish.category === 'Cenas') {
         optionsHtml = `
             <label class="modifier-option"><input type="radio" name="modOption" value="Original" checked> Original (+ S/ 0.00)</label>
-            <label class="modifier-option"><input type="radio" name="modOption" value="Arroz Chaufa"> Arroz Chaufa (+ S/ 3.00)</label>
+            <label class="modifier-option"><input type="radio" name="modOption" value="Arroz Chaufa"> Arroz Chaufa (+ S/ 2.00)</label>
         `;
     } else {
         optionsHtml = `<p class="text-muted">Sin modificadores adicionales.</p>`;
@@ -655,7 +655,15 @@ function confirmAddToCart() {
     if (selectedRadio) {
         selectedOptionName = selectedRadio.value;
         if (selectedOptionName === 'Arroz blanco') extraPrice = 3.00;
-        if (selectedOptionName === 'Arroz Chaufa') extraPrice = dishPendingMod.category === 'Parrillas' ? 5.00 : 3.00;
+        if (selectedOptionName === 'Arroz Chaufa') {
+            if (dishPendingMod.category === 'Parrillas') {
+                extraPrice = 5.00;
+            } else if (dishPendingMod.category === 'Cenas') {
+                extraPrice = 2.00;
+            } else {
+                extraPrice = 3.00;
+            }
+        }
     }
 
     const comment = document.getElementById('modalComment').value.trim();
