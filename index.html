@@ -176,6 +176,13 @@
                         </div>
                     </div>
                     <div class="tables-grid" id="tablesGrid"></div>
+                    
+                    <!-- Pedidos Para Llevar Activos -->
+                    <div style="margin-top: 2rem;">
+                        <h3>🛵 Pedidos Para Llevar Activos</h3>
+                        <p class="text-muted">Selecciona un pedido para agregar más platos, bebidas o tápers.</p>
+                        <div class="caja-cards-grid" id="takeoutOrdersGrid" style="margin-top: 1rem;"></div>
+                    </div>
                 </div>
 
                 <div id="orderSection" class="order-section hidden">
@@ -206,7 +213,7 @@
                         <div class="cart-container">
                             <h4 id="cartTableTitle">Mesa 1</h4>
                             
-                            <div id="taperSection" class="hidden" style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin:0.8rem 0; border:1px solid var(--border-color);">
+                            <div id="taperSection" style="background:#1e1e24; padding:0.8rem; border-radius:8px; margin:0.8rem 0; border:1px solid var(--border-color);">
                                 <label style="font-size:0.85rem; display:block; margin-bottom:0.3rem;">📦 Cantidad de Tápers (S/ 1.00 c/u):</label>
                                 <input type="number" id="tapersInput" min="0" value="0" onchange="updateCartUI()" style="width:100%; padding:0.4rem; border-radius:6px; background:#2b2d42; color:#fff; border:1px solid var(--border-color);" />
                             </div>
