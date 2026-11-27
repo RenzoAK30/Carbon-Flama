@@ -13,7 +13,7 @@ let isFestiva = false;
 let tables = [];
 let dishes = [];
 let kitchenOrders = [];
-let activeClientNames = {}; 
+let activeClientNames = {};
 let systemUsers = [];
 
 let isJoinMode = false;
@@ -22,6 +22,8 @@ let tablesToJoin = [];
 let selectedTable = null;
 let dishPendingMod = null;
 let selectedComandaCaja = null;
+
+let tempOrderCart = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     const loggedUser = localStorage.getItem('cf_user');
@@ -41,22 +43,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==================== REALTIME ====================
 function configurarSupabaseRealtime() {
     db.channel('public-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-          console.log('Cambio detectado en tiempo real:', payload);
-          if (payload.table === 'configuracion') {
-              isCartaFestiva = payload.new.carta_festiva;
-              isFestiva = isCartaFestiva;
-              const chk = document.getElementById('chkFestiva');
-              if (chk) chk.checked = isCartaFestiva;
-              actualizarInterfazCartaVisual();
-              renderDishes('Todas');
-          } else if (payload.table === 'usuarios') {
-              cargarUsuariosAdmin();
-          } else {
-              sincronizarComandasDesdeDB();
-          }
-      })
-      .subscribe();
+        .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
+            console.log('Cambio detectado en tiempo real:', payload);
+            if (payload.table === 'configuracion') {
+                isCartaFestiva = payload.new.carta_festiva;
+                isFestiva = isCartaFestiva;
+                const chk = document.getElementById('chkFestiva');
+                if (chk) chk.checked = isCartaFestiva;
+                actualizarInterfazCartaVisual();
+                renderDishes('Todas');
+            } else if (payload.table === 'usuarios') {
+                cargarUsuariosAdmin();
+            } else {
+                sincronizarComandasDesdeDB();
+            }
+        })
+        .subscribe();
 }
 
 async function cargarDatosDesdeSupabase() {
@@ -90,6 +92,7 @@ async function cargarDatosDesdeSupabase() {
 
         await sincronizarComandasDesdeDB();
         renderTables();
+        renderTakeoutOrdersMesero();
         renderDishes('Todas');
         renderAdminMenuCategories();
         renderAdminMesas();
@@ -133,6 +136,7 @@ async function sincronizarComandasDesdeDB() {
     renderCajaView();
     renderKitchenView();
     renderTables();
+    renderTakeoutOrdersMesero();
     renderAlmacenView();
     renderAdminMesas();
     loadFinanzasData();
@@ -141,7 +145,7 @@ async function sincronizarComandasDesdeDB() {
 
 async function handleLogin(event) {
     if (event) event.preventDefault();
-    
+
     const usuarioInput = document.getElementById('loginUsername').value.trim();
     const passwordInput = document.getElementById('loginPassword').value.trim();
 
@@ -311,7 +315,7 @@ async function generarReporteGaseosas() {
         }
 
         const bebidasCatalogo = dishes.filter(d => d.category && d.category.trim().toLowerCase() === 'bebidas');
-        
+
         if (bebidasCatalogo.length === 0) {
             contenedor.innerHTML = `<p style="color:var(--accent-yellow);">No hay bebidas registradas en el catálogo con la categoría "Bebidas".</p>`;
             return;
@@ -411,12 +415,12 @@ async function generarReporteGaseosas() {
     }
 }
 
-// ==================== MAPA DE MESAS ====================
+// ==================== MAPA DE MESAS Y PARA LLEVAR ====================
 function renderTables() {
     const grid = document.getElementById('tablesGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    
+
     tables.forEach(table => {
         const div = document.createElement('div');
         div.className = `table-card ${table.status}`;
@@ -431,6 +435,32 @@ function renderTables() {
             }
         };
         grid.appendChild(div);
+    });
+}
+
+function renderTakeoutOrdersMesero() {
+    const grid = document.getElementById('takeoutOrdersGrid');
+    if (!grid) return;
+
+    const activeTakeout = kitchenOrders.filter(
+        o => o.status !== 'cobrado' && (o.table.includes('Delivery') || o.table.includes('Llevar'))
+    );
+
+    if (activeTakeout.length === 0) {
+        grid.innerHTML = `<p class="text-muted">No hay pedidos para llevar activos.</p>`;
+        return;
+    }
+
+    grid.innerHTML = '';
+    activeTakeout.forEach(ord => {
+        const safeTableName = ord.table.replace(/'/g, "\\'");
+        grid.innerHTML += `
+            <div class="caja-ticket-card" onclick="handleTableClick('${safeTableName}')">
+                <div class="ticket-header"><span>🛵 ${ord.table}</span><span class="loyalty-tag">${ord.status.toUpperCase()}</span></div>
+                <div class="ticket-time"><b>Cliente:</b> ${ord.cliente_nombre}<br>Hora: ${ord.time} | Ítems: ${ord.items.length}</div>
+                <div class="ticket-price">S/ ${ord.total.toFixed(2)}</div>
+            </div>
+        `;
     });
 }
 
@@ -469,8 +499,6 @@ function openTakeoutView() {
 }
 
 // ==================== TOMA DE PEDIDOS ====================
-let tempOrderCart = [];
-
 function handleTableClick(tableName) {
     selectedTable = tableName;
     tempOrderCart = [];
@@ -480,18 +508,15 @@ function handleTableClick(tableName) {
     document.getElementById('currentOrderTitle').innerText = selectedTable;
     document.getElementById('cartTableTitle').innerText = selectedTable;
 
-    const taperSec = document.getElementById('taperSection');
     const tapersInput = document.getElementById('tapersInput');
-    if (tableName.includes('Delivery') || tableName.includes('Llevar')) {
-        if (taperSec) taperSec.classList.remove('hidden');
-        if (tapersInput) tapersInput.value = "0";
-    } else {
-        if (taperSec) taperSec.classList.add('hidden');
-        if (tapersInput) tapersInput.value = "0";
-    }
+    if (tapersInput) tapersInput.value = "0";
 
     const clientSpan = document.getElementById('assignedClientTag');
-    const currentName = activeClientNames[selectedTable] || 'Sin nombre';
+    const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
+    const currentName = (existingOrder && existingOrder.cliente_nombre !== 'Sin nombre')
+        ? existingOrder.cliente_nombre
+        : (activeClientNames[selectedTable] || 'Sin nombre');
+    activeClientNames[selectedTable] = currentName;
     clientSpan.innerText = `Cliente: ${currentName}`;
 
     updateCartUI();
@@ -502,6 +527,7 @@ function closeOrderSection() {
     document.getElementById('salonMapSection').classList.remove('hidden');
     selectedTable = null;
     renderTables();
+    renderTakeoutOrdersMesero();
 }
 
 // ==================== MOVER PEDIDO DE MESA ====================
@@ -598,7 +624,7 @@ function renderDishes(cat) {
     if (!grid) return;
     grid.innerHTML = '';
     const filtered = cat === 'Todas' ? dishes : dishes.filter(d => d.category === cat);
-    
+
     filtered.forEach(dish => {
         const currentPrice = isCartaFestiva ? dish.festivo : dish.price;
         const div = document.createElement('div');
@@ -683,11 +709,8 @@ function updateCartUI() {
     const existingOrder = kitchenOrders.find(o => o.table === selectedTable && o.status !== 'cobrado');
     let allItemsToDisplay = existingOrder ? [...existingOrder.items, ...tempOrderCart] : [...tempOrderCart];
 
-    let tapersCount = 0;
     const tapersInput = document.getElementById('tapersInput');
-    if (selectedTable && (selectedTable.includes('Delivery') || selectedTable.includes('Llevar'))) {
-        tapersCount = parseInt(tapersInput ? tapersInput.value : 0) || 0;
-    }
+    let tapersCount = selectedTable ? (parseInt(tapersInput ? tapersInput.value : 0) || 0) : 0;
 
     if (allItemsToDisplay.length === 0 && tapersCount === 0) {
         itemsContainer.innerHTML = `<p class="empty-msg">Sin ítems aún.</p>`;
@@ -758,7 +781,7 @@ async function enviarPedidoACocina() {
 
     let itemsAEnviar = [...tempOrderCart];
     const tapersInput = document.getElementById('tapersInput');
-    let tapersCount = (selectedTable.includes('Delivery') || selectedTable.includes('Llevar')) ? (parseInt(tapersInput ? tapersInput.value : 0) || 0) : 0;
+    let tapersCount = parseInt(tapersInput ? tapersInput.value : 0) || 0;
 
     if (itemsAEnviar.length === 0 && tapersCount === 0) {
         alert('Agrega nuevos platos o tápers antes de enviar a cocina.');
@@ -767,7 +790,7 @@ async function enviarPedidoACocina() {
 
     if (tapersCount > 0) {
         for (let i = 0; i < tapersCount; i++) {
-            itemsAEnviar.push({ name: '📦 Táper Adicional', price: 1.00 });
+            itemsAEnviar.push({ name: '📦 Táper Para Llevar', price: 1.00 });
         }
     }
 
@@ -782,11 +805,11 @@ async function enviarPedidoACocina() {
         await db.from('comandas').update({ total: nuevoTotalTotal, cliente_nombre: clienteNombre }).eq('id', existingComanda.id);
     } else {
         let totalMonto = itemsAEnviar.reduce((acc, i) => acc + i.price, 0);
-        const { data: comRes, error: errC } = await db.from('comandas').insert([{ 
-            mesa: selectedTable, 
-            estado: 'pendiente', 
+        const { data: comRes, error: errC } = await db.from('comandas').insert([{
+            mesa: selectedTable,
+            estado: 'pendiente',
             total: totalMonto,
-            cliente_nombre: clienteNombre 
+            cliente_nombre: clienteNombre
         }]).select();
 
         if (errC) { alert('Error: ' + errC.message); return; }
@@ -796,7 +819,7 @@ async function enviarPedidoACocina() {
         await db.from('items_comanda').insert(itemsIns);
     }
 
-    alert(`¡Pedido enviado a cocina con éxito!`);
+    alert('¡Pedido enviado a cocina con éxito!');
     tempOrderCart = [];
     if (tapersInput) tapersInput.value = "0";
     await sincronizarComandasDesdeDB();
@@ -867,7 +890,7 @@ function openCajaModal(comandaId) {
     if (!selectedComandaCaja) return;
 
     document.getElementById('cajaModalTitle').innerText = `Detalle de Consumo - ${selectedComandaCaja.table} (${selectedComandaCaja.cliente_nombre})`;
-    
+
     document.getElementById('cajaClientDni').value = selectedComandaCaja.cliente_dni || '';
     document.getElementById('cajaClientName').value = selectedComandaCaja.cliente_nombre !== 'Sin nombre' ? selectedComandaCaja.cliente_nombre : '';
     document.getElementById('cajaClientPhone').value = '';
@@ -1033,7 +1056,7 @@ async function cobrarSeleccionados() {
     }
 
     const remainingItems = selectedComandaCaja.items.filter(i => !itemIdsToPay.includes(i.id));
-    
+
     if (dniRegistrado) {
         await actualizarConsumoCliente(dniRegistrado, montoPagadoParcial);
         await db.from('comandas').update({ cliente_dni: dniRegistrado }).eq('id', selectedComandaCaja.id);
@@ -1347,8 +1370,8 @@ async function cargarUsuariosAdmin() {
         systemUsers = data;
         tbody.innerHTML = '';
         data.forEach(u => {
-            let estadoBadge = u.activo 
-                ? `<span style="color:var(--accent-green); font-weight:600;">Activo</span>` 
+            let estadoBadge = u.activo
+                ? `<span style="color:var(--accent-green); font-weight:600;">Activo</span>`
                 : `<span style="color:var(--accent-red); font-weight:600;">Desactivado</span>`;
 
             tbody.innerHTML += `
@@ -1380,8 +1403,8 @@ async function crearUsuarioTrabajador(e) {
     const rol = document.getElementById('usrRol').value;
 
     const { error } = await db.from('usuarios').insert([{ usuario, nombre_completo, password, rol, activo: true }]);
-    if (error) { 
-        alert('Error al crear usuario: ' + error.message); 
+    if (error) {
+        alert('Error al crear usuario: ' + error.message);
     } else {
         alert('¡Trabajador creado con éxito!');
         e.target.reset();
@@ -1459,8 +1482,8 @@ async function agregarPlato(event) {
     const categoria = document.getElementById('platoCategoria').value;
 
     const { error } = await db.from('platos').insert([{ nombre, categoria, precio, festivo, costo, stock }]);
-    if (error) { 
-        alert('Error: ' + error.message); 
+    if (error) {
+        alert('Error: ' + error.message);
     } else {
         alert('Producto agregado con éxito');
         document.getElementById('formPlato').reset();
